@@ -29,6 +29,7 @@ contract VestingContract is ReentrancyGuard, Ownable {
 
     struct Schedule {
         address token;
+        address beneficiary;
         uint256 start;
         uint256 end;
         uint256 cliff;
@@ -85,6 +86,7 @@ contract VestingContract is ReentrancyGuard, Ownable {
         vestingSchedules.push(
             Schedule({
                 token: _token,
+                beneficiary: _beneficiary,
                 start : _start,
                 end : _start.add(_durationInSecs),
                 cliff : _start.add(_cliffDurationInSecs),
@@ -141,7 +143,7 @@ contract VestingContract is ReentrancyGuard, Ownable {
 
 //
 //    function vestingScheduleForBeneficiary(address _beneficiary) external view returns (uint256 _start, uint256 _end, uint256 _cliff, uint256 _amount, uint256 _totalDrawn, uint256 _lastDrawnAt, uint256 _drawDownRate, uint256 _remainingBalance) {
-//        Schedule memory schedule = vestingSchedule[_beneficiary];
+//        Schedule storage schedule = vestingSchedule[_beneficiary];
 //        return (
 //        schedule.start,
 //        schedule.end,
@@ -154,9 +156,38 @@ contract VestingContract is ReentrancyGuard, Ownable {
 //        );
 //    }
 
-//    function availableDrawDownAmount(address _beneficiary) external view returns (uint256 _amount) {
-//        return _availableDrawDownAmount(_beneficiary);
-//    }
+    function activeScheduleIdForBeneficiary(address _beneficiary) public view returns (uint256 _currentActiveScheduleId) {
+        EnumerableSet.UintSet storage activeOrFutureScheduleIds = workerVestingSchedules[_beneficiary];
+        uint256 activeOrFutureScheduleIdsSetSize = activeOrFutureScheduleIds.length();
+
+        require(
+            activeOrFutureScheduleIdsSetSize > 0,
+            "activeScheduleIdForBeneficiary: no active schedule"
+        );
+
+        uint256 activeScheduleId;
+        for(uint i = 0; i < activeOrFutureScheduleIdsSetSize; i++) {
+            uint256 scheduleId = activeOrFutureScheduleIds.at(i);
+            Schedule storage schedule = vestingSchedules[scheduleId];
+
+            // if the schedule has not ended, this is the current schedule
+            if (_getNow() < schedule.end) {
+                activeScheduleId = scheduleId;
+                break;
+            }
+        }
+
+        require(
+            vestingSchedules[activeScheduleId].beneficiary == _beneficiary,
+            "activeScheduleIdForBeneficiary: no active schedule"
+        );
+
+        return activeScheduleId;
+    }
+
+    function availableDrawDownAmount(uint256 _scheduleId) external view returns (uint256 _amount) {
+        return _availableDrawDownAmount(_scheduleId);
+    }
 
     //////////////
     // Internal //
@@ -166,30 +197,30 @@ contract VestingContract is ReentrancyGuard, Ownable {
         return block.timestamp;
     }
 
-//    function _availableDrawDownAmount(address _beneficiary) internal view returns (uint256 _amount) {
-//        Schedule memory schedule = vestingSchedule[_beneficiary];
-//
-//        // Cliff
-//
-//        // the cliff period has not ended, therefore, no tokens to draw down
-//        if (_getNow() <= schedule.cliff) {
-//            return 0;
-//        }
-//
-//        // Ended
-//        if (_getNow() > schedule.end) {
-//            return schedule.amount.sub(schedule.totalDrawn);
-//        }
-//
-//        // Active
-//
-//        // Work out when the last invocation was
-//        uint256 timeLastDrawnOrStart = schedule.lastDrawnAt == 0 ? schedule.start : schedule.lastDrawnAt;
-//
-//        // Find out how much time has past since last invocation
-//        uint256 timePassedSinceLastInvocation = _getNow().sub(timeLastDrawnOrStart);
-//
-//        // Work out how many due tokens - time passed * rate per second
-//        return timePassedSinceLastInvocation.mul(schedule.drawDownRate);
-//    }
+    function _availableDrawDownAmount(uint256 _scheduleId) internal view returns (uint256 _amount) {
+        Schedule storage schedule = vestingSchedules[_scheduleId];
+
+        // Cliff
+
+        // the cliff period has not ended, therefore, no tokens to draw down
+        if (_getNow() <= schedule.cliff) {
+            return 0;
+        }
+
+        // Ended
+        if (_getNow() > schedule.end) {
+            return schedule.amount.sub(schedule.totalDrawn);
+        }
+
+        // Active
+
+        // Work out when the last invocation was
+        uint256 timeLastDrawnOrStart = schedule.lastDrawnAt == 0 ? schedule.start : schedule.lastDrawnAt;
+
+        // Find out how much time has past since last invocation
+        uint256 timePassedSinceLastInvocation = _getNow().sub(timeLastDrawnOrStart);
+
+        // Work out how many due tokens - time passed * rate per second
+        return timePassedSinceLastInvocation.mul(schedule.drawDownRate);
+    }
 }

@@ -103,25 +103,29 @@ contract VestingContract is ReentrancyGuard, Ownable {
         emit ScheduleCreated(_beneficiary, scheduleId);
     }
 
-//    function drawDown() whenNotPaused nonReentrant external {
-//        Schedule storage schedule = vestingSchedule[msg.sender];
-//        require(schedule.amount > 0, "VestingContract.drawDown: There is no schedule currently in flight");
-//
-//        // available right now
-//        uint256 amount = _availableDrawDownAmount(msg.sender);
-//        require(amount > 0, "VestingContract.drawDown: Nothing to withdraw");
-//
-//        // Update last drawn to now
-//        schedule.lastDrawnAt = _getNow();
-//
-//        // Increase total drawn amount
-//        schedule.totalDrawn = schedule.totalDrawn.add(amount);
-//
-//        // Issue tokens to beneficiary
-//        require(token.transfer(msg.sender, amount), "VestingContract.drawDown: Unable to transfer tokens");
-//
-//        emit DrawDown(msg.sender, amount, _getNow());
-//    }
+    // todo: this action should update workerVestingSchedules
+    function drawDown(uint256 _scheduleId) whenNotPaused nonReentrant external {
+        Schedule storage schedule = vestingSchedules[_scheduleId];
+        require(schedule.amount > 0, "VestingContract.drawDown: There is no schedule currently in flight");
+
+        // available right now
+        uint256 amount = _availableDrawDownAmount(_scheduleId);
+        require(amount > 0, "VestingContract.drawDown: Nothing to withdraw");
+
+        // Update last drawn to now
+        schedule.lastDrawnAt = _getNow();
+
+        // Increase total drawn amount
+        schedule.totalDrawn = schedule.totalDrawn.add(amount);
+
+        // Issue tokens to beneficiary
+        require(
+            IERC20(schedule.token).transfer(schedule.beneficiary, amount),
+            "VestingContract.drawDown: Unable to transfer tokens"
+        );
+
+        emit DrawDown(schedule.beneficiary, amount, _getNow());
+    }
 
 //    function pause() external {
 //        require(accessControls.hasAdminRole(_msgSender()), "VestingContract.pause: Only admin");
@@ -156,6 +160,8 @@ contract VestingContract is ReentrancyGuard, Ownable {
 //        );
 //    }
 
+    //todo: there are a number of flaws with this including the fact that you may have schedules that have ended but have amounts that can be withdrawn
+    //      need to have a re-think or maybe need a different method that compliments this and returns a list of IDs of schedules that have available draw down amounts
     function activeScheduleIdForBeneficiary(address _beneficiary) public view returns (uint256 _currentActiveScheduleId) {
         EnumerableSet.UintSet storage activeOrFutureScheduleIds = workerVestingSchedules[_beneficiary];
         uint256 activeOrFutureScheduleIdsSetSize = activeOrFutureScheduleIds.length();

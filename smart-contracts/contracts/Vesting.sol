@@ -6,10 +6,11 @@ pragma abicoder v2;
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/EnumerableSet.sol";
 
-contract VestingContract is ReentrancyGuard, Ownable {
+import { AccessControls } from "./AccessControls.sol";
+
+contract VestingContract is ReentrancyGuard {
     using SafeMath for uint256;
     using EnumerableSet for EnumerableSet.UintSet;
 
@@ -50,12 +51,14 @@ contract VestingContract is ReentrancyGuard, Ownable {
 
     bool public paused;
 
+    AccessControls public accessControls;
+
     modifier whenNotPaused() {
         require(!paused, "VestingContract: Method cannot be invoked as contract has been paused");
         _;
     }
 
-    constructor(address[] memory _whitelistedTokens, address _owner) {
+    constructor(address[] memory _whitelistedTokens, AccessControls _accessControls) {
         require(_whitelistedTokens.length > 0, "At least 1 token must be whitelisted");
 
         for(uint i = 0; i < _whitelistedTokens.length; i++) {
@@ -65,13 +68,11 @@ contract VestingContract is ReentrancyGuard, Ownable {
             whitelistedTokens[_token] = true;
         }
 
-        // todo: this may need to change to an access controls setup to be more flexible
-        transferOwnership(_owner);
+        accessControls = _accessControls;
     }
 
     function createVestingSchedule(address _token, address _beneficiary, uint256 _amount, uint256 _start, uint256 _durationInDays, uint256 _cliffDurationInDays) external {
-        // fixme
-        //require(accessControls.hasAdminRole(_msgSender()), "VestingContract.createVestingSchedule: Only admin");
+        require(accessControls.hasWhitelistRole(msg.sender), "VestingContract.createVestingSchedule: Only whitelist");
 
         require(whitelistedTokens[_token], "VestingContract.createVestingSchedule: token not whitelisted");
         require(_beneficiary != address(0), "VestingContract.createVestingSchedule: Beneficiary cannot be empty");
@@ -105,16 +106,16 @@ contract VestingContract is ReentrancyGuard, Ownable {
 
     function drawDownAll() whenNotPaused nonReentrant external {
         address beneficiary = msg.sender;
-        uint256[] memory activeWorkerScheduleIdsForBeneficiary = activeWorkerScheduleIdsForBeneficiary(beneficiary);
+        uint256[] memory activeWorkerScheduleIdsForBeneficiary_ = activeWorkerScheduleIdsForBeneficiary(beneficiary);
 
-        for(uint i = 0; i < activeWorkerScheduleIdsForBeneficiary.length; i++) {
-            uint256 scheduleId = activeWorkerScheduleIdsForBeneficiary[i];
+        for(uint i = 0; i < activeWorkerScheduleIdsForBeneficiary_.length; i++) {
+            uint256 scheduleId = activeWorkerScheduleIdsForBeneficiary_[i];
             drawDown(scheduleId);
         }
     }
 
     // todo: this action should update workerVestingSchedules i.e. when total drawn == amount, remove the schedule ID from workerVestingSchedules
-    function drawDown(uint256 _scheduleId) whenNotPaused nonReentrant external {
+    function drawDown(uint256 _scheduleId) whenNotPaused nonReentrant public {
         Schedule storage schedule = vestingSchedules[_scheduleId];
         require(schedule.amount > 0, "VestingContract.drawDown: There is no schedule currently in flight");
 
@@ -137,19 +138,19 @@ contract VestingContract is ReentrancyGuard, Ownable {
         emit DrawDown(schedule.beneficiary, amount, _getNow());
     }
 
-//    function pause() external {
-//        require(accessControls.hasAdminRole(_msgSender()), "VestingContract.pause: Only admin");
-//
-//        paused = true;
-//        emit Paused(msg.sender);
-//    }
-//
-//    function unpause() external {
-//        require(accessControls.hasAdminRole(_msgSender()), "VestingContract.unpause: Only admin");
-//
-//        paused = false;
-//        emit Unpaused(msg.sender);
-//    }
+    function pause() external {
+        require(accessControls.hasAdminRole(msg.sender), "VestingContract.pause: Only admin");
+
+        paused = true;
+        emit Paused(msg.sender);
+    }
+
+    function unpause() external {
+        require(accessControls.hasAdminRole(msg.sender), "VestingContract.unpause: Only admin");
+
+        paused = false;
+        emit Unpaused(msg.sender);
+    }
 
     ///////////////
     // Accessors //
@@ -179,10 +180,10 @@ contract VestingContract is ReentrancyGuard, Ownable {
         uint256[] memory activeScheduleIds = new uint256[](activeOrFutureScheduleIdsSetSize);
         for(uint i = 0; i < activeOrFutureScheduleIdsSetSize; i++) {
             uint256 scheduleId = activeOrFutureScheduleIds.at(i);
-            uint256 availableDrawDownAmount = availableDrawDownAmount(scheduleId);
+            uint256 availableDrawDownAmount_ = availableDrawDownAmount(scheduleId);
 
             // if the schedule has not ended, this is the current schedule
-            if (availableDrawDownAmount > 0 && _getNow() > vestingSchedules[scheduleId].cliff) {
+            if (availableDrawDownAmount_ > 0 && _getNow() > vestingSchedules[scheduleId].cliff) {
                 activeScheduleIds[i] = scheduleId;
             }
         }

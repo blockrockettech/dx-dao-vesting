@@ -103,7 +103,17 @@ contract VestingContract is ReentrancyGuard, Ownable {
         emit ScheduleCreated(_beneficiary, scheduleId);
     }
 
-    // todo: this action should update workerVestingSchedules
+    function drawDownAll() whenNotPaused nonReentrant external {
+        address beneficiary = msg.sender;
+        uint256[] memory activeWorkerScheduleIdsForBeneficiary = activeWorkerScheduleIdsForBeneficiary(beneficiary);
+
+        for(uint i = 0; i < activeWorkerScheduleIdsForBeneficiary.length; i++) {
+            uint256 scheduleId = activeWorkerScheduleIdsForBeneficiary[i];
+            drawDown(scheduleId);
+        }
+    }
+
+    // todo: this action should update workerVestingSchedules i.e. when total drawn == amount, remove the schedule ID from workerVestingSchedules
     function drawDown(uint256 _scheduleId) whenNotPaused nonReentrant external {
         Schedule storage schedule = vestingSchedules[_scheduleId];
         require(schedule.amount > 0, "VestingContract.drawDown: There is no schedule currently in flight");
@@ -160,38 +170,27 @@ contract VestingContract is ReentrancyGuard, Ownable {
 //        );
 //    }
 
-    //todo: there are a number of flaws with this including the fact that you may have schedules that have ended but have amounts that can be withdrawn
-    //      need to have a re-think or maybe need a different method that compliments this and returns a list of IDs of schedules that have available draw down amounts
-    function activeScheduleIdForBeneficiary(address _beneficiary) public view returns (uint256 _currentActiveScheduleId) {
+    function activeWorkerScheduleIdsForBeneficiary(address _beneficiary) public view returns (uint256[] memory _activeScheduleIds) {
         EnumerableSet.UintSet storage activeOrFutureScheduleIds = workerVestingSchedules[_beneficiary];
         uint256 activeOrFutureScheduleIdsSetSize = activeOrFutureScheduleIds.length();
 
-        require(
-            activeOrFutureScheduleIdsSetSize > 0,
-            "activeScheduleIdForBeneficiary: no active schedule"
-        );
+        require(activeOrFutureScheduleIdsSetSize > 0, "activeScheduleIdForBeneficiary: no active schedules");
 
-        uint256 activeScheduleId;
+        uint256[] memory activeScheduleIds = new uint256[](activeOrFutureScheduleIdsSetSize);
         for(uint i = 0; i < activeOrFutureScheduleIdsSetSize; i++) {
             uint256 scheduleId = activeOrFutureScheduleIds.at(i);
-            Schedule storage schedule = vestingSchedules[scheduleId];
+            uint256 availableDrawDownAmount = availableDrawDownAmount(scheduleId);
 
             // if the schedule has not ended, this is the current schedule
-            if (_getNow() < schedule.end) {
-                activeScheduleId = scheduleId;
-                break;
+            if (availableDrawDownAmount > 0 && _getNow() > vestingSchedules[scheduleId].cliff) {
+                activeScheduleIds[i] = scheduleId;
             }
         }
 
-        require(
-            vestingSchedules[activeScheduleId].beneficiary == _beneficiary,
-            "activeScheduleIdForBeneficiary: no active schedule"
-        );
-
-        return activeScheduleId;
+        return activeScheduleIds;
     }
 
-    function availableDrawDownAmount(uint256 _scheduleId) external view returns (uint256 _amount) {
+    function availableDrawDownAmount(uint256 _scheduleId) public view returns (uint256 _amount) {
         return _availableDrawDownAmount(_scheduleId);
     }
 

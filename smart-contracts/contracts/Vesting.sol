@@ -156,20 +156,34 @@ contract VestingContract is ReentrancyGuard {
     // Accessors //
     ///////////////
 
-//
-//    function vestingScheduleForBeneficiary(address _beneficiary) external view returns (uint256 _start, uint256 _end, uint256 _cliff, uint256 _amount, uint256 _totalDrawn, uint256 _lastDrawnAt, uint256 _drawDownRate, uint256 _remainingBalance) {
-//        Schedule storage schedule = vestingSchedule[_beneficiary];
-//        return (
-//        schedule.start,
-//        schedule.end,
-//        schedule.cliff,
-//        schedule.amount,
-//        schedule.totalDrawn,
-//        schedule.lastDrawnAt,
-//        schedule.drawDownRate,
-//        schedule.amount.sub(schedule.totalDrawn)
-//        );
-//    }
+
+    function workerVestingSchedule(uint256 _scheduleId) external view returns (
+        address _token,
+        address _beneficiary,
+        uint256 _start,
+        uint256 _end,
+        uint256 _cliff,
+        uint256 _amount,
+        uint256 _totalDrawn,
+        uint256 _lastDrawnAt,
+        uint256 _drawDownRate,
+        uint256 _remainingBalance
+    ) {
+        Schedule storage schedule = vestingSchedules[_scheduleId];
+
+        return (
+        schedule.token,
+        schedule.beneficiary,
+        schedule.start,
+        schedule.end,
+        schedule.cliff,
+        schedule.amount,
+        schedule.totalDrawn,
+        schedule.lastDrawnAt,
+        schedule.drawDownRate,
+        schedule.amount.sub(schedule.totalDrawn)
+        );
+    }
 
     function activeWorkerScheduleIdsForBeneficiary(address _beneficiary) public view returns (uint256[] memory _activeScheduleIds) {
         EnumerableSet.UintSet storage activeOrFutureScheduleIds = workerVestingSchedules[_beneficiary];

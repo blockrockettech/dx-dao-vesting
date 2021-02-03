@@ -10,7 +10,7 @@ import "@openzeppelin/contracts/utils/EnumerableSet.sol";
 
 import { AccessControls } from "./AccessControls.sol";
 
-contract VestingContract is ReentrancyGuard {
+contract Vesting is ReentrancyGuard {
     using SafeMath for uint256;
     using EnumerableSet for EnumerableSet.UintSet;
 

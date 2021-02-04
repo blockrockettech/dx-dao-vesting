@@ -57,7 +57,7 @@ contract Vesting is ReentrancyGuard {
     AccessControls public accessControls;
 
     modifier whenNotPaused() {
-        require(!paused, "VestingContract: Method cannot be invoked as contract has been paused");
+        require(!paused, "Vesting: Method cannot be invoked as contract has been paused");
         _;
     }
 
@@ -75,13 +75,13 @@ contract Vesting is ReentrancyGuard {
     }
 
     function createVestingSchedule(address _token, address _beneficiary, uint256 _amount, uint256 _start, uint256 _durationInDays, uint256 _cliffDurationInDays) external {
-        require(accessControls.hasWhitelistRole(msg.sender), "VestingContract.createVestingSchedule: Only whitelist");
+        require(accessControls.hasWhitelistRole(msg.sender), "Vesting.createVestingSchedule: Only whitelist");
 
-        require(whitelistedTokens[_token], "VestingContract.createVestingSchedule: token not whitelisted");
-        require(_beneficiary != address(0), "VestingContract.createVestingSchedule: Beneficiary cannot be empty");
-        require(_amount > 0, "VestingContract.createVestingSchedule: Amount cannot be empty");
-        require(_durationInDays > 0, "VestingContract.createVestingSchedule: Duration cannot be empty");
-        require(_cliffDurationInDays <= _durationInDays, "VestingContract.createVestingSchedule: Cliff can not be bigger than duration");
+        require(whitelistedTokens[_token], "Vesting.createVestingSchedule: token not whitelisted");
+        require(_beneficiary != address(0), "Vesting.createVestingSchedule: Beneficiary cannot be empty");
+        require(_amount > 0, "Vesting.createVestingSchedule: Amount cannot be empty");
+        require(_durationInDays > 0, "Vesting.createVestingSchedule: Duration cannot be empty");
+        require(_cliffDurationInDays <= _durationInDays, "Vesting.createVestingSchedule: Cliff can not be bigger than duration");
 
         // Create schedule
         uint256 _durationInSecs = _durationInDays.mul(PERIOD_ONE_DAY_IN_SECONDS);
@@ -119,17 +119,22 @@ contract Vesting is ReentrancyGuard {
     }
 
     function pause() external {
-        require(accessControls.hasAdminRole(msg.sender), "VestingContract.pause: Only admin");
+        require(accessControls.hasAdminRole(msg.sender), "Vesting.pause: Only admin");
 
         paused = true;
         emit Paused(msg.sender);
     }
 
     function unpause() external {
-        require(accessControls.hasAdminRole(msg.sender), "VestingContract.unpause: Only admin");
+        require(accessControls.hasAdminRole(msg.sender), "Vesting.unpause: Only admin");
 
         paused = false;
         emit Unpaused(msg.sender);
+    }
+
+    function withdraw(IERC20 _token, address _to, uint256 _amount) external {
+        require(accessControls.hasAdminRole(msg.sender), "Vesting.withdraw: Only admin");
+        _token.transfer(_to, _amount);
     }
 
     ///////////////
@@ -204,11 +209,11 @@ contract Vesting is ReentrancyGuard {
 
     function _drawDown(uint256 _scheduleId) internal {
         Schedule storage schedule = vestingSchedules[_scheduleId];
-        require(schedule.amount > 0, "VestingContract.drawDown: There is no schedule currently in flight");
+        require(schedule.amount > 0, "Vesting.drawDown: There is no schedule currently in flight");
 
         // available right now
         uint256 amount = _availableDrawDownAmount(_scheduleId);
-        require(amount > 0, "VestingContract.drawDown: Nothing to withdraw");
+        require(amount > 0, "Vesting.drawDown: Nothing to withdraw");
 
         // Update last drawn to now
         lastDrawnAt[_scheduleId] = _getNow();
@@ -219,7 +224,7 @@ contract Vesting is ReentrancyGuard {
         // Issue tokens to beneficiary
         require(
             IERC20(schedule.token).transfer(schedule.beneficiary, amount),
-            "VestingContract.drawDown: Unable to transfer tokens"
+            "Vesting.drawDown: Unable to transfer tokens"
         );
 
         emit DrawDown(schedule.beneficiary, amount, _getNow());

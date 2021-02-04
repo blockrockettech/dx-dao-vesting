@@ -90,7 +90,7 @@ contract('Vesting contract tests', function ([admin, dao, beneficiary, random, .
           '1',
           {from: random}
         ),
-        "VestingContract.createVestingSchedule: Only whitelist"
+        "Vesting.createVestingSchedule: Only whitelist"
       )
     })
 
@@ -105,7 +105,7 @@ contract('Vesting contract tests', function ([admin, dao, beneficiary, random, .
           '1',
           {from: dao}
         ),
-        "VestingContract.createVestingSchedule: token not whitelisted"
+        "Vesting.createVestingSchedule: token not whitelisted"
       )
     })
 
@@ -120,7 +120,7 @@ contract('Vesting contract tests', function ([admin, dao, beneficiary, random, .
           '1',
           {from: dao}
         ),
-        "VestingContract.createVestingSchedule: Beneficiary cannot be empty"
+        "Vesting.createVestingSchedule: Beneficiary cannot be empty"
       )
     })
 
@@ -135,7 +135,7 @@ contract('Vesting contract tests', function ([admin, dao, beneficiary, random, .
           '1',
           {from: dao}
         ),
-        "VestingContract.createVestingSchedule: Amount cannot be empty"
+        "Vesting.createVestingSchedule: Amount cannot be empty"
       )
     })
 
@@ -150,7 +150,7 @@ contract('Vesting contract tests', function ([admin, dao, beneficiary, random, .
           '1',
           {from: dao}
         ),
-        "VestingContract.createVestingSchedule: Duration cannot be empty"
+        "Vesting.createVestingSchedule: Duration cannot be empty"
       )
     })
 
@@ -165,7 +165,7 @@ contract('Vesting contract tests', function ([admin, dao, beneficiary, random, .
           '4',
           {from: dao}
         ),
-        "VestingContract.createVestingSchedule: Cliff can not be bigger than duration"
+        "Vesting.createVestingSchedule: Cliff can not be bigger than duration"
       )
     })
   })
@@ -203,7 +203,7 @@ contract('Vesting contract tests', function ([admin, dao, beneficiary, random, .
       it('Cannot draw down', async () => {
         await expectRevert(
           this.vesting.drawDown('0'),
-          "VestingContract: Method cannot be invoked as contract has been paused"
+          "Vesting: Method cannot be invoked as contract has been paused"
         )
       })
 
@@ -363,6 +363,25 @@ contract('Vesting contract tests', function ([admin, dao, beneficiary, random, .
           expect(activeScheduleIdsForBeneficiary[0]).to.be.bignumber.equal('2')
         })
       })
+    })
+  })
+
+  describe('withdraw()', () => {
+    beforeEach(async () => {
+      await this.mockToken.transfer(this.vesting.address, to18dp('5000'))
+    })
+
+    it('can withdraw excess tokens as admin', async () => {
+      const adminBalBefore = await this.mockToken.balanceOf(admin)
+
+      const withdrawAmt = to18dp('1000')
+      await this.vesting.withdraw(this.mockToken.address, admin, withdrawAmt)
+
+      const adminBalAfter = await this.mockToken.balanceOf(admin)
+
+      expect(
+        adminBalAfter.sub(adminBalBefore)
+      ).to.be.bignumber.equal(withdrawAmt)
     })
   })
 })

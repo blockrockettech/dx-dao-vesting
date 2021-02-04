@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 pragma solidity 0.7.6;
-pragma abicoder v2;
+//pragma abicoder v2;
 
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -191,6 +191,7 @@ contract Vesting is ReentrancyGuard {
         EnumerableSet.UintSet storage activeOrFutureScheduleIds = workerVestingSchedules[_beneficiary];
         uint256 activeOrFutureScheduleIdsSetSize = activeOrFutureScheduleIds.length();
 
+        // FIXME: return empty array?
         require(activeOrFutureScheduleIdsSetSize > 0, "activeScheduleIdForBeneficiary: no active schedules");
 
         uint256 activeCount;
@@ -259,4 +260,6 @@ contract Vesting is ReentrancyGuard {
         // Work out how many due tokens - time passed * rate per second
         return timePassedSinceLastInvocation.mul(schedule.drawDownRate);
     }
+
+    // FIXME function to extract tokens locked in the contact
 }

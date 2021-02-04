@@ -137,7 +137,10 @@ contract Vesting is ReentrancyGuard {
         _token.transfer(_to, _amount);
     }
 
-    // todo withdraw ether
+    function withdrawEther(address payable _to, uint256 _amount) external {
+        require(accessControls.hasAdminRole(msg.sender), "Vesting.withdrawEther: Only admin");
+        _to.transfer(_amount);
+    }
 
     function whitelistToken(address _tokenAddress) external {
         require(accessControls.hasAdminRole(msg.sender), "Vesting.whitelistToken: Only admin");

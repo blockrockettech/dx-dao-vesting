@@ -294,6 +294,31 @@ contract('Vesting contract tests', function ([admin, dao, beneficiary, random, .
           expect(activeWorkerScheduleIdsForBeneficiary[0]).to.be.bignumber.equal('1')
         })
       })
+
+      describe('When 1st, 2nd and 3rd schedule only active', () => {
+        beforeEach(async () => {
+          // set now to start at the same time as first schedule
+          await this.vesting.setNow(PERIOD_ONE_DAY_IN_SECONDS.muln(9))
+        })
+
+        it('Correctly returns only schedule #0, #1 and #2 for list of active schedule IDs', async () => {
+          const activeWorkerScheduleIdsForBeneficiary = await this.vesting.activeWorkerScheduleIdsForBeneficiary(beneficiary)
+          expect(activeWorkerScheduleIdsForBeneficiary.length).to.be.equal(3)
+          expect(activeWorkerScheduleIdsForBeneficiary[0]).to.be.bignumber.equal('0')
+          expect(activeWorkerScheduleIdsForBeneficiary[1]).to.be.bignumber.equal('1')
+          expect(activeWorkerScheduleIdsForBeneficiary[2]).to.be.bignumber.equal('2')
+        })
+
+        it('Returns #2 after #0 and #1 are fully drawn down', async () => {
+          await this.vesting.drawDownAll({from: beneficiary})
+
+          await this.vesting.setNow(PERIOD_ONE_DAY_IN_SECONDS.muln(10))
+
+          const activeWorkerScheduleIdsForBeneficiary = await this.vesting.activeWorkerScheduleIdsForBeneficiary(beneficiary)
+          expect(activeWorkerScheduleIdsForBeneficiary.length).to.be.equal(1)
+          expect(activeWorkerScheduleIdsForBeneficiary[0]).to.be.bignumber.equal('2')
+        })
+      })
     })
   })
 })

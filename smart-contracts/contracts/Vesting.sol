@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 
 pragma solidity 0.7.6;
-pragma abicoder v2;
 
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -9,8 +8,6 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/EnumerableSet.sol";
 
 import { AccessControls } from "./AccessControls.sol";
-
-import "hardhat/console.sol";
 
 contract Vesting is ReentrancyGuard {
     using SafeMath for uint256;
@@ -100,7 +97,6 @@ contract Vesting is ReentrancyGuard {
             })
         );
 
-        // todo: what if this is a dxd schedule being created?
         workerVestingSchedules[_beneficiary].add(scheduleId);
 
         emit ScheduleCreated(_beneficiary, scheduleId);
@@ -112,32 +108,12 @@ contract Vesting is ReentrancyGuard {
 
         for(uint i = 0; i < activeWorkerScheduleIdsForBeneficiary_.length; i++) {
             uint256 scheduleId = activeWorkerScheduleIdsForBeneficiary_[i];
-            drawDown(scheduleId);
+            _drawDown(scheduleId);
         }
     }
 
-    // todo: this action should update workerVestingSchedules i.e. when total drawn == amount, remove the schedule ID from workerVestingSchedules
     function drawDown(uint256 _scheduleId) whenNotPaused nonReentrant public {
-        Schedule storage schedule = vestingSchedules[_scheduleId];
-        require(schedule.amount > 0, "VestingContract.drawDown: There is no schedule currently in flight");
-
-        // available right now
-        uint256 amount = _availableDrawDownAmount(_scheduleId);
-        require(amount > 0, "VestingContract.drawDown: Nothing to withdraw");
-
-        // Update last drawn to now
-        schedule.lastDrawnAt = _getNow();
-
-        // Increase total drawn amount
-        schedule.totalDrawn = schedule.totalDrawn.add(amount);
-
-        // Issue tokens to beneficiary
-        require(
-            IERC20(schedule.token).transfer(schedule.beneficiary, amount),
-            "VestingContract.drawDown: Unable to transfer tokens"
-        );
-
-        emit DrawDown(schedule.beneficiary, amount, _getNow());
+        _drawDown(_scheduleId);
     }
 
     function pause() external {
@@ -228,6 +204,29 @@ contract Vesting is ReentrancyGuard {
     //////////////
     // Internal //
     //////////////
+
+    function _drawDown(uint256 _scheduleId) internal {
+        Schedule storage schedule = vestingSchedules[_scheduleId];
+        require(schedule.amount > 0, "VestingContract.drawDown: There is no schedule currently in flight");
+
+        // available right now
+        uint256 amount = _availableDrawDownAmount(_scheduleId);
+        require(amount > 0, "VestingContract.drawDown: Nothing to withdraw");
+
+        // Update last drawn to now
+        schedule.lastDrawnAt = _getNow();
+
+        // Increase total drawn amount
+        schedule.totalDrawn = schedule.totalDrawn.add(amount);
+
+        // Issue tokens to beneficiary
+        require(
+            IERC20(schedule.token).transfer(schedule.beneficiary, amount),
+            "VestingContract.drawDown: Unable to transfer tokens"
+        );
+
+        emit DrawDown(schedule.beneficiary, amount, _getNow());
+    }
 
     function _getNow() internal view virtual returns (uint256) {
         return block.timestamp;

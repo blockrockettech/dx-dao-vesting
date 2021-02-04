@@ -7,7 +7,7 @@ const AccessControls = artifacts.require('AccessControls');
 const MockERC20 = artifacts.require('MockERC20');
 const Vesting = artifacts.require('Vesting');
 
-contract('Vesting contract tests', function ([admin, dao, beneficiary, ...otherAccounts]) {
+contract('Vesting contract tests', function ([admin, dao, beneficiary, random, ...otherAccounts]) {
   const firstScheduleId = '0'
 
   const PERIOD_ONE_DAY_IN_SECONDS = new BN('86400')
@@ -65,6 +65,96 @@ contract('Vesting contract tests', function ([admin, dao, beneficiary, ...otherA
       expect(_lastDrawnAt).to.be.bignumber.equal('0')
       expect(_drawDownRate).to.be.bignumber.equal(new BN('5').div(_durationInSecs))
       expect(_remainingBalance).to.be.bignumber.equal(new BN('5'))
+    })
+
+    it('Reverts when sender does not have whitelist', async () => {
+      await expectRevert(
+        this.vesting.createVestingSchedule(
+          this.mockToken.address,
+          beneficiary,
+          '5',
+          '0',
+          '3',
+          '1',
+          {from: random}
+        ),
+        "VestingContract.createVestingSchedule: Only whitelist"
+      )
+    })
+
+    it('Reverts when token is not whitelisted', async () => {
+      await expectRevert(
+        this.vesting.createVestingSchedule(
+          random,
+          beneficiary,
+          '5',
+          '0',
+          '3',
+          '1',
+          {from: dao}
+        ),
+        "VestingContract.createVestingSchedule: token not whitelisted"
+      )
+    })
+
+    it('Reverts when beneficiary is address zero', async () => {
+      await expectRevert(
+        this.vesting.createVestingSchedule(
+          this.mockToken.address,
+          ZERO_ADDRESS,
+          '5',
+          '0',
+          '3',
+          '1',
+          {from: dao}
+        ),
+        "VestingContract.createVestingSchedule: Beneficiary cannot be empty"
+      )
+    })
+
+    it('Reverts when amount is zero', async () => {
+      await expectRevert(
+        this.vesting.createVestingSchedule(
+          this.mockToken.address,
+          beneficiary,
+          '0',
+          '0',
+          '3',
+          '1',
+          {from: dao}
+        ),
+        "VestingContract.createVestingSchedule: Amount cannot be empty"
+      )
+    })
+
+    it('Reverts when duration is zero', async () => {
+      await expectRevert(
+        this.vesting.createVestingSchedule(
+          this.mockToken.address,
+          beneficiary,
+          '5',
+          '0',
+          '0',
+          '1',
+          {from: dao}
+        ),
+        "VestingContract.createVestingSchedule: Duration cannot be empty"
+      )
+    })
+
+    it('Reverts when cliff is bigger than duration', async () => {
+      await expectRevert(
+        this.vesting.createVestingSchedule(
+          this.mockToken.address,
+          beneficiary,
+          '5',
+          '0',
+          '3',
+          '4',
+          {from: dao}
+        ),
+        "VestingContract.createVestingSchedule: Cliff can not be bigger than duration"
+      )
     })
   })
 })

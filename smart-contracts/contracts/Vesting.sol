@@ -278,6 +278,4 @@ contract Vesting is ReentrancyGuard {
         // Work out how many due tokens - time passed * rate per second
         return timePassedSinceLastInvocation.mul(schedule.drawDownRate);
     }
-
-    // FIXME function to extract tokens locked in the contact
 }

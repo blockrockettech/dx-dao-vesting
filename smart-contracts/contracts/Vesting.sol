@@ -84,18 +84,18 @@ contract Vesting is ReentrancyGuard {
         require(_cliffDurationInDays <= _durationInDays, "Vesting.createVestingSchedule: Cliff can not be bigger than duration");
 
         // Create schedule
-        uint256 _durationInSecs = _durationInDays.mul(PERIOD_ONE_DAY_IN_SECONDS);
-        uint256 _cliffDurationInSecs = _cliffDurationInDays.mul(PERIOD_ONE_DAY_IN_SECONDS);
+        uint256 durationInSecs = _durationInDays.mul(PERIOD_ONE_DAY_IN_SECONDS);
+        uint256 cliffDurationInSecs = _cliffDurationInDays.mul(PERIOD_ONE_DAY_IN_SECONDS);
         uint256 scheduleId = vestingSchedules.length;
         vestingSchedules.push(
             Schedule({
                 token: _token,
                 beneficiary: _beneficiary,
                 start : _start,
-                end : _start.add(_durationInSecs),
-                cliff : _start.add(_cliffDurationInSecs),
+                end : _start.add(durationInSecs),
+                cliff : _start.add(cliffDurationInSecs),
                 amount : _amount,
-                drawDownRate : _amount.div(_durationInSecs)
+                drawDownRate : _amount.div(durationInSecs)
             })
         );
 
@@ -194,7 +194,7 @@ contract Vesting is ReentrancyGuard {
 
             // if there is an available amount then either an unclaimed or active schedule
             if (availableDrawDownAmount_ > 0) {
-                activeCount += 1;
+                activeCount = activeCount.add(1);
             }
         }
 
@@ -208,7 +208,7 @@ contract Vesting is ReentrancyGuard {
             // if there is an available amount then either an unclaimed or active schedule
             if (availableDrawDownAmount_ > 0) {
                 activeScheduleIds[nextIndex] = scheduleId;
-                nextIndex += 1;
+                nextIndex = nextIndex.add(1);
             }
         }
 

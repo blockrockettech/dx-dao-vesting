@@ -19,7 +19,11 @@ contract('Vesting contract tests', function ([admin, dao, beneficiary, random, .
     return new BN(value).mul(new BN('10').pow(new BN('18')))
   }
 
-  const shouldBeNumberInEtherCloseTo = (valInWei, expected) => parseFloat(fromWei(valInWei)).should.be.closeTo(parseFloat(expected.toString()), 0.000001);
+  const shouldBeNumberInEtherCloseTo = (valInWei, expected) => {
+    return expect(
+      parseFloat(fromWei(valInWei))
+    ).to.be.closeTo(parseFloat(expected.toString()), 0.000001)
+  };
 
   beforeEach(async () => {
     this.accessControls = await AccessControls.new({from: admin})

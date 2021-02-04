@@ -384,4 +384,24 @@ contract('Vesting contract tests', function ([admin, dao, beneficiary, random, .
       ).to.be.bignumber.equal(withdrawAmt)
     })
   })
+
+  describe('whitelistToken()', () => {
+    it('Can whitelist a token', async () => {
+      expect(await this.vesting.whitelistedTokens(random)).to.be.false
+
+      await this.vesting.whitelistToken(random, {from: admin})
+
+      expect(await this.vesting.whitelistedTokens(random)).to.be.true
+    })
+  })
+
+  describe('removeTokenFromWhitelist()', () => {
+    it('Can remove a token', async () => {
+      expect(await this.vesting.whitelistedTokens(this.mockToken.address)).to.be.true
+
+      await this.vesting.removeTokenFromWhitelist(this.mockToken.address, {from: admin})
+
+      expect(await this.vesting.whitelistedTokens(this.mockToken.address)).to.be.false
+    })
+  })
 })

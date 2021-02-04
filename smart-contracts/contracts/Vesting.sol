@@ -137,6 +137,19 @@ contract Vesting is ReentrancyGuard {
         _token.transfer(_to, _amount);
     }
 
+    // todo withdraw ether
+
+    function whitelistToken(address _tokenAddress) external {
+        require(accessControls.hasAdminRole(msg.sender), "Vesting.whitelistToken: Only admin");
+        require(address(_tokenAddress) != address(0), "Vesting.whitelistToken: Cannot be address zero");
+        whitelistedTokens[_tokenAddress] = true;
+    }
+
+    function removeTokenFromWhitelist(address _tokenAddress) external {
+        require(accessControls.hasAdminRole(msg.sender), "Vesting.whitelistToken: Only admin");
+        whitelistedTokens[_tokenAddress] = false;
+    }
+
     ///////////////
     // Accessors //
     ///////////////

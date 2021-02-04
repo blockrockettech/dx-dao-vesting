@@ -42,7 +42,7 @@ contract Payroll is Vesting {
         uint256 dailyAmount = yearlySalary.div(365);
         uint256 fullAmountToVest = _durationInDays.mul(dailyAmount);
 
-        uint256 amountToVest = fullAmountToVest.div(100_00).mul(_percentageWorked);
+        uint256 amountToVest = fullAmountToVest.div(100).mul(_percentageWorked);
 
         createVestingSchedule(
             _token,

@@ -1,16 +1,25 @@
 const {BN, constants, expectEvent, expectRevert, ether, balance} = require('@openzeppelin/test-helpers');
 const {ZERO_ADDRESS} = constants;
 
+const {fromWei} = require('web3-utils');
+
 const { expect } = require('chai');
 
 const AccessControls = artifacts.require('AccessControls');
 const MockERC20 = artifacts.require('MockERC20');
 const Vesting = artifacts.require('Vesting');
+const VestingWithFixedTime = artifacts.require('VestingWithFixedTime');
 
 contract('Vesting contract tests', function ([admin, dao, beneficiary, random, ...otherAccounts]) {
   const firstScheduleId = '0'
 
   const PERIOD_ONE_DAY_IN_SECONDS = new BN('86400')
+
+  const to18dp = (value) => {
+    return new BN(value).mul(new BN('10').pow(new BN('18')))
+  }
+
+  const shouldBeNumberInEtherCloseTo = (valInWei, expected) => parseFloat(fromWei(valInWei)).should.be.closeTo(parseFloat(expected.toString()), 0.000001);
 
   beforeEach(async () => {
     this.accessControls = await AccessControls.new({from: admin})
@@ -65,6 +74,10 @@ contract('Vesting contract tests', function ([admin, dao, beneficiary, random, .
       expect(_lastDrawnAt).to.be.bignumber.equal('0')
       expect(_drawDownRate).to.be.bignumber.equal(new BN('5').div(_durationInSecs))
       expect(_remainingBalance).to.be.bignumber.equal(new BN('5'))
+
+      const activeWorkerScheduleIdsForBeneficiary = await this.vesting.activeWorkerScheduleIdsForBeneficiary(_beneficiary)
+      expect(activeWorkerScheduleIdsForBeneficiary.length).to.be.equal(1)
+      expect(activeWorkerScheduleIdsForBeneficiary[0]).to.be.bignumber.equal('0')
     })
 
     it('Reverts when sender does not have whitelist', async () => {
@@ -155,6 +168,58 @@ contract('Vesting contract tests', function ([admin, dao, beneficiary, random, .
         ),
         "VestingContract.createVestingSchedule: Cliff can not be bigger than duration"
       )
+    })
+  })
+
+  describe('drawing down', () => {
+    beforeEach(async () => {
+      // we need to override the real vesting contract with a mock one that allows time to be moved easily
+      this.vesting = await VestingWithFixedTime.new([this.mockToken.address], this.accessControls.address, {from: admin})
+
+      // set now
+      await this.vesting.setNow('1');
+
+      // send funds to the contract
+      await this.mockToken.transfer(this.vesting.address, to18dp('5'))
+    })
+
+    describe('When a single vesting schedule is set up', () => {
+      beforeEach(async () => {
+        this.vestedAmount = to18dp('2')
+
+        // this will create schedule #0
+        await this.vesting.createVestingSchedule(
+          this.mockToken.address,
+          beneficiary,
+          this.vestedAmount,
+          '1',
+          '4',
+          '0', // no cliff
+          {from: dao}
+        )
+      })
+
+      it('Can draw down a quarter in 1 day after start', async () => {
+        const oneDayAfterStart = PERIOD_ONE_DAY_IN_SECONDS.addn(1) // add start time
+
+        await this.vesting.setNow(oneDayAfterStart);
+
+        const beneficiaryBalBefore = await this.mockToken.balanceOf(beneficiary)
+
+        // draw down from schedule zero. Anyone can call but only beneficiary gets
+        await this.vesting.drawDown('0')
+
+        const beneficiaryBalAfter = await this.mockToken.balanceOf(beneficiary)
+
+        // expect(
+        //   beneficiaryBalAfter.sub(beneficiaryBalBefore)
+        // ).to.be.bignumber.equal(this.vestedAmount.divn('4'))
+
+        shouldBeNumberInEtherCloseTo(
+          beneficiaryBalAfter.sub(beneficiaryBalBefore),
+          fromWei(this.vestedAmount.divn('4'))
+        )
+      })
     })
   })
 })

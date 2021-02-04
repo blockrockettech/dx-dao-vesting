@@ -10,6 +10,8 @@ import "@openzeppelin/contracts/utils/EnumerableSet.sol";
 
 import { AccessControls } from "./AccessControls.sol";
 
+import "hardhat/console.sol";
+
 contract Vesting is ReentrancyGuard {
     using SafeMath for uint256;
     using EnumerableSet for EnumerableSet.UintSet;
@@ -191,21 +193,35 @@ contract Vesting is ReentrancyGuard {
 
         require(activeOrFutureScheduleIdsSetSize > 0, "activeScheduleIdForBeneficiary: no active schedules");
 
-        uint256[] memory activeScheduleIds = new uint256[](activeOrFutureScheduleIdsSetSize);
+        uint256 activeCount;
         for(uint i = 0; i < activeOrFutureScheduleIdsSetSize; i++) {
             uint256 scheduleId = activeOrFutureScheduleIds.at(i);
-            uint256 availableDrawDownAmount_ = availableDrawDownAmount(scheduleId);
+            uint256 availableDrawDownAmount_ = _availableDrawDownAmount(scheduleId);
 
-            // if the schedule has not ended, this is the current schedule
-            if (availableDrawDownAmount_ > 0 && _getNow() > vestingSchedules[scheduleId].cliff) {
-                activeScheduleIds[i] = scheduleId;
+            // if there is an available amount then either an unclaimed or active schedule
+            if (availableDrawDownAmount_ > 0) {
+                activeCount += 1;
+            }
+        }
+
+        // loop needed twice to allocate memory for the array
+        uint256[] memory activeScheduleIds = new uint256[](activeCount);
+        uint256 nextIndex;
+        for(uint j = 0; j < activeOrFutureScheduleIdsSetSize; j++) {
+            uint256 scheduleId = activeOrFutureScheduleIds.at(j);
+            uint256 availableDrawDownAmount_ = _availableDrawDownAmount(scheduleId);
+
+            // if there is an available amount then either an unclaimed or active schedule
+            if (availableDrawDownAmount_ > 0) {
+                activeScheduleIds[nextIndex] = scheduleId;
+                nextIndex += 1;
             }
         }
 
         return activeScheduleIds;
     }
 
-    function availableDrawDownAmount(uint256 _scheduleId) public view returns (uint256 _amount) {
+    function availableDrawDownAmount(uint256 _scheduleId) external view returns (uint256 _amount) {
         return _availableDrawDownAmount(_scheduleId);
     }
 

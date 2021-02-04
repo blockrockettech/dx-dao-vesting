@@ -184,10 +184,10 @@ contract('Vesting contract tests', function ([admin, dao, beneficiary, random, .
       await this.vesting.setNow('1');
 
       // send funds to the contract
-      await this.mockToken.transfer(this.vesting.address, to18dp('5'))
+      await this.mockToken.transfer(this.vesting.address, to18dp('20000'))
     })
 
-    describe('When a single vesting schedule is set up', () => {
+    describe('When a single vesting schedule is set up (no cliff)', () => {
       beforeEach(async () => {
         this.vestedAmount = to18dp('2')
 
@@ -215,14 +215,84 @@ contract('Vesting contract tests', function ([admin, dao, beneficiary, random, .
 
         const beneficiaryBalAfter = await this.mockToken.balanceOf(beneficiary)
 
-        // expect(
-        //   beneficiaryBalAfter.sub(beneficiaryBalBefore)
-        // ).to.be.bignumber.equal(this.vestedAmount.divn('4'))
-
         shouldBeNumberInEtherCloseTo(
           beneficiaryBalAfter.sub(beneficiaryBalBefore),
           fromWei(this.vestedAmount.divn('4'))
         )
+      })
+    })
+
+    describe('When multiple vesting schedules are setup (no cliff)', () => {
+      beforeEach(async () => {
+        this.vestedAmount = to18dp('5000')
+
+        // this will create schedule #0 and add to the list of active schedules
+        await this.vesting.createVestingSchedule(
+          this.mockToken.address,
+          beneficiary,
+          this.vestedAmount,
+          '0',
+          '4',
+          '0', // no cliff
+          {from: dao}
+        )
+
+        // this will create schedule #1 and add to the list of active schedules
+        await this.vesting.createVestingSchedule(
+          this.mockToken.address,
+          beneficiary,
+          this.vestedAmount.muln(2),
+          PERIOD_ONE_DAY_IN_SECONDS.muln(4), // start at the end of prev
+          '4',
+          '0', // no cliff
+          {from: dao}
+        )
+
+        // this will create schedule #2 and add to the list of active schedules
+        await this.vesting.createVestingSchedule(
+          this.mockToken.address,
+          beneficiary,
+          this.vestedAmount,
+          PERIOD_ONE_DAY_IN_SECONDS.muln(8), // start at the end of prev
+          '4',
+          '0', // no cliff
+          {from: dao}
+        )
+      })
+
+      describe('When first schedule only is active', () => {
+        beforeEach(async () => {
+          // set now to start at the same time as first schedule
+          await this.vesting.setNow('10')
+        })
+
+        it('Correctly returns only schedule #0 for list of active schedule IDs', async () => {
+          const activeWorkerScheduleIdsForBeneficiary = await this.vesting.activeWorkerScheduleIdsForBeneficiary(beneficiary)
+          expect(activeWorkerScheduleIdsForBeneficiary.length).to.be.equal(1)
+          expect(activeWorkerScheduleIdsForBeneficiary[0]).to.be.bignumber.equal('0')
+        })
+      })
+
+      describe('When 1st and 2nd schedule only active', () => {
+        beforeEach(async () => {
+          // set now to start at the same time as first schedule
+          await this.vesting.setNow(PERIOD_ONE_DAY_IN_SECONDS.muln(5))
+        })
+
+        it('Correctly returns only schedule #0 and #1 for list of active schedule IDs', async () => {
+          const activeWorkerScheduleIdsForBeneficiary = await this.vesting.activeWorkerScheduleIdsForBeneficiary(beneficiary)
+          expect(activeWorkerScheduleIdsForBeneficiary.length).to.be.equal(2)
+          expect(activeWorkerScheduleIdsForBeneficiary[0]).to.be.bignumber.equal('0')
+          expect(activeWorkerScheduleIdsForBeneficiary[1]).to.be.bignumber.equal('1')
+        })
+
+        it('Returns #1 after #0 is fully drawn down', async () => {
+          await this.vesting.drawDown('0')
+
+          const activeWorkerScheduleIdsForBeneficiary = await this.vesting.activeWorkerScheduleIdsForBeneficiary(beneficiary)
+          expect(activeWorkerScheduleIdsForBeneficiary.length).to.be.equal(1)
+          expect(activeWorkerScheduleIdsForBeneficiary[0]).to.be.bignumber.equal('1')
+        })
       })
     })
   })

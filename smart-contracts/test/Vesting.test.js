@@ -182,6 +182,52 @@ contract('Vesting contract tests', function ([admin, dao, beneficiary, random, .
       await this.mockToken.transfer(this.vesting.address, to18dp('20000'))
     })
 
+    describe('When paused', () => {
+      beforeEach(async () => {
+        this.vestedAmount = to18dp('2')
+
+        // this will create schedule #0
+        await this.vesting.createVestingSchedule(
+          this.mockToken.address,
+          beneficiary,
+          this.vestedAmount,
+          '1',
+          '4',
+          '0', // no cliff
+          {from: dao}
+        )
+
+        await this.vesting.pause({from: admin})
+      })
+
+      it('Cannot draw down', async () => {
+        await expectRevert(
+          this.vesting.drawDown('0'),
+          "VestingContract: Method cannot be invoked as contract has been paused"
+        )
+      })
+
+      it('Can draw down once unpaused', async () => {
+        await this.vesting.unpause({from: admin})
+
+        const oneDayAfterStart = PERIOD_ONE_DAY_IN_SECONDS.addn(1) // add start time
+
+        await this.vesting.setNow(oneDayAfterStart);
+
+        const beneficiaryBalBefore = await this.mockToken.balanceOf(beneficiary)
+
+        // draw down from schedule zero. Anyone can call but only beneficiary gets
+        await this.vesting.drawDown('0')
+
+        const beneficiaryBalAfter = await this.mockToken.balanceOf(beneficiary)
+
+        shouldBeNumberInEtherCloseTo(
+          beneficiaryBalAfter.sub(beneficiaryBalBefore),
+          fromWei(this.vestedAmount.divn('4'))
+        )
+      })
+    })
+
     describe('When a single vesting schedule is set up (no cliff)', () => {
       beforeEach(async () => {
         this.vestedAmount = to18dp('2')
@@ -306,6 +352,9 @@ contract('Vesting contract tests', function ([admin, dao, beneficiary, random, .
 
         it('Returns #2 after #0 and #1 are fully drawn down', async () => {
           await this.vesting.drawDownAll({from: beneficiary})
+
+          // available draw down amount is zero so need to move the time forward or activeScheduleIdsForBeneficiary will return an empty array
+          expect(await this.vesting.availableDrawDownAmount('2')).to.be.bignumber.equal('0')
 
           await this.vesting.setNow(PERIOD_ONE_DAY_IN_SECONDS.muln(10))
 

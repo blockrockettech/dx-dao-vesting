@@ -74,7 +74,7 @@ contract Vesting is ReentrancyGuard {
         accessControls = _accessControls;
     }
 
-    function createVestingSchedule(address _token, address _beneficiary, uint256 _amount, uint256 _start, uint256 _durationInDays, uint256 _cliffDurationInDays) external {
+    function createVestingSchedule(address _token, address _beneficiary, uint256 _amount, uint256 _start, uint256 _durationInDays, uint256 _cliffDurationInDays) public {
         require(accessControls.hasWhitelistRole(msg.sender), "Vesting.createVestingSchedule: Only whitelist");
 
         require(whitelistedTokens[_token], "Vesting.createVestingSchedule: token not whitelisted");

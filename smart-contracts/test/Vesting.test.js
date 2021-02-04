@@ -59,11 +59,9 @@ contract('Vesting contract tests', function ([admin, dao, beneficiary, random, .
         _end,
         _cliff,
         _amount,
-        _totalDrawn,
-        _lastDrawnAt,
         _drawDownRate,
         _remainingBalance
-      } = await this.vesting.workerVestingSchedule(firstScheduleId)
+      } = await this.vesting.vestingSchedule(firstScheduleId)
 
       const _durationInSecs = new BN('3').mul(PERIOD_ONE_DAY_IN_SECONDS);
       const _cliffDurationInSecs = new BN('1').mul(PERIOD_ONE_DAY_IN_SECONDS);
@@ -74,14 +72,11 @@ contract('Vesting contract tests', function ([admin, dao, beneficiary, random, .
       expect(_end).to.be.bignumber.equal(_durationInSecs)
       expect(_cliff).to.be.bignumber.equal(_cliffDurationInSecs)
       expect(_amount).to.be.bignumber.equal('5')
-      expect(_totalDrawn).to.be.bignumber.equal('0')
-      expect(_lastDrawnAt).to.be.bignumber.equal('0')
       expect(_drawDownRate).to.be.bignumber.equal(new BN('5').div(_durationInSecs))
-      expect(_remainingBalance).to.be.bignumber.equal(new BN('5'))
 
-      const activeWorkerScheduleIdsForBeneficiary = await this.vesting.activeWorkerScheduleIdsForBeneficiary(_beneficiary)
-      expect(activeWorkerScheduleIdsForBeneficiary.length).to.be.equal(1)
-      expect(activeWorkerScheduleIdsForBeneficiary[0]).to.be.bignumber.equal('0')
+      const activeScheduleIdsForBeneficiary = await this.vesting.activeScheduleIdsForBeneficiary(_beneficiary)
+      expect(activeScheduleIdsForBeneficiary.length).to.be.equal(1)
+      expect(activeScheduleIdsForBeneficiary[0]).to.be.bignumber.equal('0')
     })
 
     it('Reverts when sender does not have whitelist', async () => {
@@ -267,9 +262,9 @@ contract('Vesting contract tests', function ([admin, dao, beneficiary, random, .
         })
 
         it('Correctly returns only schedule #0 for list of active schedule IDs', async () => {
-          const activeWorkerScheduleIdsForBeneficiary = await this.vesting.activeWorkerScheduleIdsForBeneficiary(beneficiary)
-          expect(activeWorkerScheduleIdsForBeneficiary.length).to.be.equal(1)
-          expect(activeWorkerScheduleIdsForBeneficiary[0]).to.be.bignumber.equal('0')
+          const activeScheduleIdsForBeneficiary = await this.vesting.activeScheduleIdsForBeneficiary(beneficiary)
+          expect(activeScheduleIdsForBeneficiary.length).to.be.equal(1)
+          expect(activeScheduleIdsForBeneficiary[0]).to.be.bignumber.equal('0')
         })
       })
 
@@ -280,18 +275,18 @@ contract('Vesting contract tests', function ([admin, dao, beneficiary, random, .
         })
 
         it('Correctly returns only schedule #0 and #1 for list of active schedule IDs', async () => {
-          const activeWorkerScheduleIdsForBeneficiary = await this.vesting.activeWorkerScheduleIdsForBeneficiary(beneficiary)
-          expect(activeWorkerScheduleIdsForBeneficiary.length).to.be.equal(2)
-          expect(activeWorkerScheduleIdsForBeneficiary[0]).to.be.bignumber.equal('0')
-          expect(activeWorkerScheduleIdsForBeneficiary[1]).to.be.bignumber.equal('1')
+          const activeScheduleIdsForBeneficiary = await this.vesting.activeScheduleIdsForBeneficiary(beneficiary)
+          expect(activeScheduleIdsForBeneficiary.length).to.be.equal(2)
+          expect(activeScheduleIdsForBeneficiary[0]).to.be.bignumber.equal('0')
+          expect(activeScheduleIdsForBeneficiary[1]).to.be.bignumber.equal('1')
         })
 
         it('Returns #1 after #0 is fully drawn down', async () => {
           await this.vesting.drawDown('0')
 
-          const activeWorkerScheduleIdsForBeneficiary = await this.vesting.activeWorkerScheduleIdsForBeneficiary(beneficiary)
-          expect(activeWorkerScheduleIdsForBeneficiary.length).to.be.equal(1)
-          expect(activeWorkerScheduleIdsForBeneficiary[0]).to.be.bignumber.equal('1')
+          const activeScheduleIdsForBeneficiary = await this.vesting.activeScheduleIdsForBeneficiary(beneficiary)
+          expect(activeScheduleIdsForBeneficiary.length).to.be.equal(1)
+          expect(activeScheduleIdsForBeneficiary[0]).to.be.bignumber.equal('1')
         })
       })
 
@@ -302,11 +297,11 @@ contract('Vesting contract tests', function ([admin, dao, beneficiary, random, .
         })
 
         it('Correctly returns only schedule #0, #1 and #2 for list of active schedule IDs', async () => {
-          const activeWorkerScheduleIdsForBeneficiary = await this.vesting.activeWorkerScheduleIdsForBeneficiary(beneficiary)
-          expect(activeWorkerScheduleIdsForBeneficiary.length).to.be.equal(3)
-          expect(activeWorkerScheduleIdsForBeneficiary[0]).to.be.bignumber.equal('0')
-          expect(activeWorkerScheduleIdsForBeneficiary[1]).to.be.bignumber.equal('1')
-          expect(activeWorkerScheduleIdsForBeneficiary[2]).to.be.bignumber.equal('2')
+          const activeScheduleIdsForBeneficiary = await this.vesting.activeScheduleIdsForBeneficiary(beneficiary)
+          expect(activeScheduleIdsForBeneficiary.length).to.be.equal(3)
+          expect(activeScheduleIdsForBeneficiary[0]).to.be.bignumber.equal('0')
+          expect(activeScheduleIdsForBeneficiary[1]).to.be.bignumber.equal('1')
+          expect(activeScheduleIdsForBeneficiary[2]).to.be.bignumber.equal('2')
         })
 
         it('Returns #2 after #0 and #1 are fully drawn down', async () => {
@@ -314,9 +309,9 @@ contract('Vesting contract tests', function ([admin, dao, beneficiary, random, .
 
           await this.vesting.setNow(PERIOD_ONE_DAY_IN_SECONDS.muln(10))
 
-          const activeWorkerScheduleIdsForBeneficiary = await this.vesting.activeWorkerScheduleIdsForBeneficiary(beneficiary)
-          expect(activeWorkerScheduleIdsForBeneficiary.length).to.be.equal(1)
-          expect(activeWorkerScheduleIdsForBeneficiary[0]).to.be.bignumber.equal('2')
+          const activeScheduleIdsForBeneficiary = await this.vesting.activeScheduleIdsForBeneficiary(beneficiary)
+          expect(activeScheduleIdsForBeneficiary.length).to.be.equal(1)
+          expect(activeScheduleIdsForBeneficiary[0]).to.be.bignumber.equal('2')
         })
       })
     })

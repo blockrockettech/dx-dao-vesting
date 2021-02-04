@@ -34,15 +34,19 @@ contract Vesting is ReentrancyGuard {
         uint256 end;
         uint256 cliff;
         uint256 amount;
-        uint256 totalDrawn;
-        uint256 lastDrawnAt;
         uint256 drawDownRate;
     }
 
     Schedule[] vestingSchedules;
 
-    // Worker address to IDs of active or future vesting schedules
-    mapping(address => EnumerableSet.UintSet) workerVestingSchedules;
+    /// @notice Schedule ID -> totalDrawn by beneficiary
+    mapping(uint256 => uint256) public totalDrawn;
+
+    /// @notice Schedule ID -> last drawn timestamp
+    mapping(uint256 => uint256) public lastDrawnAt;
+
+    // Beneficiary -> IDs of all associated vesting schedules
+    mapping(address => EnumerableSet.UintSet) beneficiaryVestingSchedules;
 
     mapping(address => bool) public whitelistedTokens;
 
@@ -91,20 +95,18 @@ contract Vesting is ReentrancyGuard {
                 end : _start.add(_durationInSecs),
                 cliff : _start.add(_cliffDurationInSecs),
                 amount : _amount,
-                totalDrawn : 0, // no tokens drawn yet
-                lastDrawnAt : 0, // never invoked
                 drawDownRate : _amount.div(_durationInSecs)
             })
         );
 
-        workerVestingSchedules[_beneficiary].add(scheduleId);
+        beneficiaryVestingSchedules[_beneficiary].add(scheduleId);
 
         emit ScheduleCreated(_beneficiary, scheduleId);
     }
 
     function drawDownAll() whenNotPaused nonReentrant external {
         address beneficiary = msg.sender;
-        uint256[] memory activeWorkerScheduleIdsForBeneficiary_ = activeWorkerScheduleIdsForBeneficiary(beneficiary);
+        uint256[] memory activeWorkerScheduleIdsForBeneficiary_ = activeScheduleIdsForBeneficiary(beneficiary);
 
         for(uint i = 0; i < activeWorkerScheduleIdsForBeneficiary_.length; i++) {
             uint256 scheduleId = activeWorkerScheduleIdsForBeneficiary_[i];
@@ -135,17 +137,14 @@ contract Vesting is ReentrancyGuard {
     ///////////////
 
 
-    function workerVestingSchedule(uint256 _scheduleId) external view returns (
+    function vestingSchedule(uint256 _scheduleId) external view returns (
         address _token,
         address _beneficiary,
         uint256 _start,
         uint256 _end,
         uint256 _cliff,
         uint256 _amount,
-        uint256 _totalDrawn,
-        uint256 _lastDrawnAt,
-        uint256 _drawDownRate,
-        uint256 _remainingBalance
+        uint256 _drawDownRate
     ) {
         Schedule storage schedule = vestingSchedules[_scheduleId];
 
@@ -156,15 +155,12 @@ contract Vesting is ReentrancyGuard {
         schedule.end,
         schedule.cliff,
         schedule.amount,
-        schedule.totalDrawn,
-        schedule.lastDrawnAt,
-        schedule.drawDownRate,
-        schedule.amount.sub(schedule.totalDrawn)
+        schedule.drawDownRate
         );
     }
 
-    function activeWorkerScheduleIdsForBeneficiary(address _beneficiary) public view returns (uint256[] memory _activeScheduleIds) {
-        EnumerableSet.UintSet storage activeOrFutureScheduleIds = workerVestingSchedules[_beneficiary];
+    function activeScheduleIdsForBeneficiary(address _beneficiary) public view returns (uint256[] memory _activeScheduleIds) {
+        EnumerableSet.UintSet storage activeOrFutureScheduleIds = beneficiaryVestingSchedules[_beneficiary];
         uint256 activeOrFutureScheduleIdsSetSize = activeOrFutureScheduleIds.length();
 
         // FIXME: return empty array?
@@ -215,10 +211,10 @@ contract Vesting is ReentrancyGuard {
         require(amount > 0, "VestingContract.drawDown: Nothing to withdraw");
 
         // Update last drawn to now
-        schedule.lastDrawnAt = _getNow();
+        lastDrawnAt[_scheduleId] = _getNow();
 
         // Increase total drawn amount
-        schedule.totalDrawn = schedule.totalDrawn.add(amount);
+        totalDrawn[_scheduleId] = totalDrawn[_scheduleId].add(amount);
 
         // Issue tokens to beneficiary
         require(
@@ -245,13 +241,13 @@ contract Vesting is ReentrancyGuard {
 
         // Ended
         if (_getNow() > schedule.end) {
-            return schedule.amount.sub(schedule.totalDrawn);
+            return schedule.amount.sub(totalDrawn[_scheduleId]);
         }
 
         // Active
 
         // Work out when the last invocation was
-        uint256 timeLastDrawnOrStart = schedule.lastDrawnAt == 0 ? schedule.start : schedule.lastDrawnAt;
+        uint256 timeLastDrawnOrStart = lastDrawnAt[_scheduleId] == 0 ? schedule.start : lastDrawnAt[_scheduleId];
 
         // Find out how much time has past since last invocation
         uint256 timePassedSinceLastInvocation = _getNow().sub(timeLastDrawnOrStart);

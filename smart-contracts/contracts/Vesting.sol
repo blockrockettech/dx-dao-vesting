@@ -184,8 +184,10 @@ contract Vesting is ReentrancyGuard {
         EnumerableSet.UintSet storage activeOrFutureScheduleIds = beneficiaryVestingSchedules[_beneficiary];
         uint256 activeOrFutureScheduleIdsSetSize = activeOrFutureScheduleIds.length();
 
-        // FIXME: return empty array?
-        require(activeOrFutureScheduleIdsSetSize > 0, "activeScheduleIdForBeneficiary: no active schedules");
+        if (activeOrFutureScheduleIdsSetSize == 0) {
+            uint256[] memory tmp = new uint256[](0);
+            return tmp;
+        }
 
         uint256 activeCount;
         for(uint i = 0; i < activeOrFutureScheduleIdsSetSize; i++) {

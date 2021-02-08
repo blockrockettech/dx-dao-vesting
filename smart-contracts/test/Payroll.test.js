@@ -104,6 +104,26 @@ contract('Payroll contract tests', function ([admin, dao, beneficiary, ...otherA
     )
   })
 
+  it('Can update the salary of a worker ', async () => {
+    const levelBeingUpdated = '5';
+
+    const existingSalary = await this.payroll.workerExperienceLevelToSalary(levelBeingUpdated)
+    expect(existingSalary).to.be.bignumber.equal(to18dp(experienceToSalary[levelBeingUpdated]))
+
+    const newSalary = to18dp('500')
+    await this.payroll.updateWorkerExperienceLevelSalary(levelBeingUpdated, newSalary)
+
+    const updatedSalary = await this.payroll.workerExperienceLevelToSalary(levelBeingUpdated)
+    expect(updatedSalary).to.be.bignumber.equal(newSalary)
+  })
+
+  it('Reverts when updating salary as non admin', async () => {
+    await expectRevert(
+      this.payroll.updateWorkerExperienceLevelSalary('5', '5', {from: beneficiary}),
+      "Payroll.updateWorkerExperienceLevelSalary: Only admin"
+    )
+  })
+
   describe('Deploying', () => {
     it('Reverts when experience array is empty', async () => {
       await expectRevert(

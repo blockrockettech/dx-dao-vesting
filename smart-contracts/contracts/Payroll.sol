@@ -53,4 +53,9 @@ contract Payroll is Vesting {
             _cliffDurationInDays
         );
     }
+
+    function updateWorkerExperienceLevelSalary(uint256 _level, uint256 _salary) external {
+        require(accessControls.hasAdminRole(msg.sender), "Payroll.updateWorkerExperienceLevelSalary: Only admin");
+        workerExperienceLevelToSalary[_level] = _salary;
+    }
 }

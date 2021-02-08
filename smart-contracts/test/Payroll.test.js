@@ -7,7 +7,6 @@ const { expect } = require('chai');
 
 const AccessControls = artifacts.require('AccessControls');
 const MockERC20 = artifacts.require('MockERC20');
-const Vesting = artifacts.require('Vesting');
 const PayrollWithFixedTime = artifacts.require('PayrollWithFixedTime');
 
 contract('Payroll contract tests', function ([admin, dao, beneficiary, ...otherAccounts]) {
@@ -103,5 +102,33 @@ contract('Payroll contract tests', function ([admin, dao, beneficiary, ...otherA
       ),
       "createPayroll: Invalid experience level"
     )
+  })
+
+  describe('Deploying', () => {
+    it('Reverts when experience array is empty', async () => {
+      await expectRevert(
+        PayrollWithFixedTime.new(
+          [this.mockToken.address],
+          this.accessControls.address,
+          [],
+          [],
+          {from: admin}
+        ),
+        "No experience configs supplied"
+      )
+    })
+
+    it('Reverts when experience array lengths are inconsistent', async () => {
+      await expectRevert(
+        PayrollWithFixedTime.new(
+          [this.mockToken.address],
+          this.accessControls.address,
+          ['1'],
+          [],
+          {from: admin}
+        ),
+        "Inconsistent experience level array lengths"
+      )
+    })
   })
 })

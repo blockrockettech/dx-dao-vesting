@@ -198,6 +198,15 @@ contract('Vesting contract tests', function ([admin, admin2, dao, beneficiary, r
       await this.mockToken.transfer(this.vesting.address, to18dp('20000'))
     })
 
+    describe('Validation', () => {
+      it('Reverts when drawing down a schedule that does not exist', async () => {
+        await expectRevert(
+          this.vesting.drawDown('99'),
+          "invalid opcode"
+        )
+      })
+    })
+
     describe('When paused', () => {
       beforeEach(async () => {
         this.vestedAmount = to18dp('2')
@@ -275,6 +284,12 @@ contract('Vesting contract tests', function ([admin, admin2, dao, beneficiary, r
         shouldBeNumberInEtherCloseTo(
           beneficiaryBalAfter.sub(beneficiaryBalBefore),
           fromWei(this.vestedAmount.divn('4'))
+        )
+
+        // check that you can't withdraw again
+        await expectRevert(
+          this.vesting.drawDown('0'),
+          "Vesting.drawDown: Nothing to withdraw"
         )
       })
     })

@@ -1,4 +1,4 @@
-const {BN, constants, expectEvent, expectRevert, ether, balance} = require('@openzeppelin/test-helpers');
+const {BN, constants, expectEvent, expectRevert, ether, balance, send} = require('@openzeppelin/test-helpers');
 const {ZERO_ADDRESS} = constants;
 
 const {fromWei} = require('web3-utils');
@@ -10,7 +10,7 @@ const MockERC20 = artifacts.require('MockERC20');
 const Vesting = artifacts.require('Vesting');
 const VestingWithFixedTime = artifacts.require('VestingWithFixedTime');
 
-contract('Vesting contract tests', function ([admin, dao, beneficiary, random, ...otherAccounts]) {
+contract('Vesting contract tests', function ([admin, admin2, dao, beneficiary, random, ...otherAccounts]) {
   const firstScheduleId = '0'
 
   const PERIOD_ONE_DAY_IN_SECONDS = new BN('86400')
@@ -34,9 +34,25 @@ contract('Vesting contract tests', function ([admin, dao, beneficiary, random, .
     this.vesting = await Vesting.new([this.mockToken.address], this.accessControls.address, {from: admin})
   })
 
-  it('Has deployed the vesting contract correctly', async () => {
-    expect(await this.vesting.whitelistedTokens(this.mockToken.address)).to.be.true
-    expect(await this.vesting.accessControls()).to.be.equal(this.accessControls.address)
+  describe('Deployments', () => {
+    it('Has deployed the vesting contract correctly', async () => {
+      expect(await this.vesting.whitelistedTokens(this.mockToken.address)).to.be.true
+      expect(await this.vesting.accessControls()).to.be.equal(this.accessControls.address)
+    })
+
+    it('Reverts when whitelist token array is empty', async () => {
+      await expectRevert(
+        Vesting.new([], this.accessControls.address, {from: admin}),
+        "At least 1 token must be whitelisted"
+      )
+    })
+
+    it('Reverts when a whitelist token is address zero', async () => {
+      await expectRevert(
+        Vesting.new([ZERO_ADDRESS], this.accessControls.address, {from: admin}),
+        "Supplied address cannot be the zero address"
+      )
+    })
   })
 
   describe('createVestingSchedule()', () => {
@@ -67,7 +83,7 @@ contract('Vesting contract tests', function ([admin, dao, beneficiary, random, .
       const _cliffDurationInSecs = new BN('1').mul(PERIOD_ONE_DAY_IN_SECONDS);
 
       expect(_token).to.be.equal(this.mockToken.address)
-      expect(_beneficiary).to.be.equal(_beneficiary)
+      expect(_beneficiary).to.be.equal(beneficiary)
       expect(_start).to.be.bignumber.equal('0')
       expect(_end).to.be.bignumber.equal(_durationInSecs)
       expect(_cliff).to.be.bignumber.equal(_cliffDurationInSecs)
@@ -383,6 +399,35 @@ contract('Vesting contract tests', function ([admin, dao, beneficiary, random, .
         adminBalAfter.sub(adminBalBefore)
       ).to.be.bignumber.equal(withdrawAmt)
     })
+
+    it('Reverts if not admin', async () => {
+      await expectRevert(
+        this.vesting.withdraw(this.mockToken.address, admin, '9', {from: random}),
+        "Vesting.withdraw: Only admin"
+      )
+    })
+  })
+
+  describe('withdrawEther()', () => {
+    beforeEach(async () => {
+      await send.ether(admin, this.vesting.address, ether('0.25'))
+    })
+
+    it('can withdraw any ether as admin', async () => {
+      const balanceTrackerAdmin = await balance.tracker(admin2)
+
+      const withdrawAmt = ether('0.125')
+      await this.vesting.withdrawEther(admin2, withdrawAmt, {from: admin})
+
+      expect(await balanceTrackerAdmin.delta()).to.be.bignumber.equal(withdrawAmt)
+    })
+
+    it('Reverts if not admin', async () => {
+      await expectRevert(
+        this.vesting.withdrawEther(admin, '9', {from: random}),
+        "Vesting.withdrawEther: Only admin"
+      )
+    })
   })
 
   describe('whitelistToken()', () => {
@@ -393,6 +438,20 @@ contract('Vesting contract tests', function ([admin, dao, beneficiary, random, .
 
       expect(await this.vesting.whitelistedTokens(random)).to.be.true
     })
+
+    it('Reverts if not admin', async () => {
+      await expectRevert(
+        this.vesting.whitelistToken(random, {from: random}),
+        "Vesting.whitelistToken: Only admin"
+      )
+    })
+
+    it('Reverts if token address is address zero', async () => {
+      await expectRevert(
+        this.vesting.whitelistToken(ZERO_ADDRESS, {from: admin}),
+        "Vesting.whitelistToken: Cannot be address zero"
+      )
+    })
   })
 
   describe('removeTokenFromWhitelist()', () => {
@@ -402,6 +461,38 @@ contract('Vesting contract tests', function ([admin, dao, beneficiary, random, .
       await this.vesting.removeTokenFromWhitelist(this.mockToken.address, {from: admin})
 
       expect(await this.vesting.whitelistedTokens(this.mockToken.address)).to.be.false
+    })
+
+    it('Reverts if not admin', async () => {
+      await expectRevert(
+        this.vesting.removeTokenFromWhitelist(random, {from: random}),
+        "Vesting.removeTokenFromWhitelist: Only admin"
+      )
+    })
+  })
+
+  describe('activeScheduleIdsForBeneficiary()', () => {
+    it('Returns an empty array when no schedules exist for an account', async () => {
+      const ids = await this.vesting.activeScheduleIdsForBeneficiary(random)
+      expect(ids.length).to.be.equal(0)
+    })
+  })
+
+  describe('pause()', () => {
+    it('Reverts when trying to pause without the admin role', async () => {
+      await expectRevert(
+        this.vesting.pause({from: random}),
+        "Vesting.pause: Only admin"
+      )
+    })
+  })
+
+  describe('unpause()', () => {
+    it('Reverts when trying to pause without the admin role', async () => {
+      await expectRevert(
+        this.vesting.unpause({from: random}),
+        "Vesting.unpause: Only admin"
+      )
     })
   })
 })

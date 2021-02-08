@@ -74,7 +74,14 @@ contract Vesting is ReentrancyGuard {
         accessControls = _accessControls;
     }
 
-    function createVestingSchedule(address _token, address _beneficiary, uint256 _amount, uint256 _start, uint256 _durationInDays, uint256 _cliffDurationInDays) public {
+    function createVestingSchedule(
+        address _token, // todo: should we check the token at the specified address implements the ERC20 interface?
+        address _beneficiary,
+        uint256 _amount,
+        uint256 _start,
+        uint256 _durationInDays,
+        uint256 _cliffDurationInDays
+    ) public {
         require(accessControls.hasWhitelistRole(msg.sender), "Vesting.createVestingSchedule: Only whitelist");
 
         require(whitelistedTokens[_token], "Vesting.createVestingSchedule: token not whitelisted");
@@ -149,9 +156,11 @@ contract Vesting is ReentrancyGuard {
     }
 
     function removeTokenFromWhitelist(address _tokenAddress) external {
-        require(accessControls.hasAdminRole(msg.sender), "Vesting.whitelistToken: Only admin");
+        require(accessControls.hasAdminRole(msg.sender), "Vesting.removeTokenFromWhitelist: Only admin");
         whitelistedTokens[_tokenAddress] = false;
     }
+
+    receive() payable external {}
 
     ///////////////
     // Accessors //

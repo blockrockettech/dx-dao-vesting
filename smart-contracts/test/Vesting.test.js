@@ -75,8 +75,7 @@ contract('Vesting contract tests', function ([admin, admin2, dao, beneficiary, r
         _end,
         _cliff,
         _amount,
-        _drawDownRate,
-        _remainingBalance
+        _drawDownRate
       } = await this.vesting.vestingSchedule(firstScheduleId)
 
       const _durationInSecs = new BN('3').mul(PERIOD_ONE_DAY_IN_SECONDS);
@@ -183,6 +182,43 @@ contract('Vesting contract tests', function ([admin, admin2, dao, beneficiary, r
         ),
         "Vesting.createVestingSchedule: Cliff can not be bigger than duration"
       )
+    })
+  })
+
+  describe('createVestingScheduleWithDefaults()', () => {
+    it('When using method, creates vesting schedule with default length and cliff', async () => {
+      await this.vesting.createVestingScheduleWithDefaults(
+        this.mockToken.address,
+        beneficiary,
+        to18dp('50'),
+        '0',
+        {from: dao}
+      )
+
+      const {
+        _token,
+        _beneficiary,
+        _start,
+        _end,
+        _cliff,
+        _amount,
+        _drawDownRate
+      } = await this.vesting.vestingSchedule(firstScheduleId)
+
+      const _durationInSecs = new BN('730').mul(PERIOD_ONE_DAY_IN_SECONDS);
+      const _cliffDurationInSecs = new BN('365').mul(PERIOD_ONE_DAY_IN_SECONDS);
+
+      expect(_token).to.be.equal(this.mockToken.address)
+      expect(_beneficiary).to.be.equal(beneficiary)
+      expect(_start).to.be.bignumber.equal('0')
+      expect(_end).to.be.bignumber.equal(_durationInSecs)
+      expect(_cliff).to.be.bignumber.equal(_cliffDurationInSecs)
+      expect(_amount).to.be.bignumber.equal(to18dp('50'))
+      expect(_drawDownRate).to.be.bignumber.equal(to18dp('50').div(_durationInSecs))
+
+      const activeScheduleIdsForBeneficiary = await this.vesting.activeScheduleIdsForBeneficiary(_beneficiary)
+      expect(activeScheduleIdsForBeneficiary.length).to.be.equal(1)
+      expect(activeScheduleIdsForBeneficiary[0]).to.be.bignumber.equal('0')
     })
   })
 

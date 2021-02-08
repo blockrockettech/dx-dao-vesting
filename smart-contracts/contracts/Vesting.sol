@@ -74,41 +74,42 @@ contract Vesting is ReentrancyGuard {
         accessControls = _accessControls;
     }
 
+    function createVestingScheduleWithDefaults(
+        address _token,
+        address _beneficiary,
+        uint256 _amount,
+        uint256 _start
+    ) public {
+        uint256 durationInDays = 730;
+        uint256 cliffDurationInDays = 365;
+
+        _createVestingSchedule(
+            _token,
+            _beneficiary,
+            _amount,
+            _start,
+            durationInDays,
+            cliffDurationInDays
+        );
+    }
+
     function createVestingSchedule(
-        address _token, // todo: should we check the token at the specified address implements the ERC20 interface?
+        // todo: should we check the token at the specified address implements the ERC20 interface?
+        address _token,
         address _beneficiary,
         uint256 _amount,
         uint256 _start,
         uint256 _durationInDays,
         uint256 _cliffDurationInDays
     ) public {
-        require(accessControls.hasWhitelistRole(msg.sender), "Vesting.createVestingSchedule: Only whitelist");
-
-        require(whitelistedTokens[_token], "Vesting.createVestingSchedule: token not whitelisted");
-        require(_beneficiary != address(0), "Vesting.createVestingSchedule: Beneficiary cannot be empty");
-        require(_amount > 0, "Vesting.createVestingSchedule: Amount cannot be empty");
-        require(_durationInDays > 0, "Vesting.createVestingSchedule: Duration cannot be empty");
-        require(_cliffDurationInDays <= _durationInDays, "Vesting.createVestingSchedule: Cliff can not be bigger than duration");
-
-        // Create schedule
-        uint256 durationInSecs = _durationInDays.mul(PERIOD_ONE_DAY_IN_SECONDS);
-        uint256 cliffDurationInSecs = _cliffDurationInDays.mul(PERIOD_ONE_DAY_IN_SECONDS);
-        uint256 scheduleId = vestingSchedules.length;
-        vestingSchedules.push(
-            Schedule({
-                token: _token,
-                beneficiary: _beneficiary,
-                start : _start,
-                end : _start.add(durationInSecs),
-                cliff : _start.add(cliffDurationInSecs),
-                amount : _amount,
-                drawDownRate : _amount.div(durationInSecs)
-            })
+        _createVestingSchedule(
+            _token,
+            _beneficiary,
+            _amount,
+            _start,
+            _durationInDays,
+            _cliffDurationInDays
         );
-
-        beneficiaryVestingSchedules[_beneficiary].add(scheduleId);
-
-        emit ScheduleCreated(_beneficiary, scheduleId);
     }
 
     function drawDownAll() whenNotPaused nonReentrant external {
@@ -233,6 +234,43 @@ contract Vesting is ReentrancyGuard {
     //////////////
     // Internal //
     //////////////
+
+    function _createVestingSchedule(
+        address _token,
+        address _beneficiary,
+        uint256 _amount,
+        uint256 _start,
+        uint256 _durationInDays,
+        uint256 _cliffDurationInDays
+    ) private {
+        require(accessControls.hasWhitelistRole(msg.sender), "Vesting.createVestingSchedule: Only whitelist");
+
+        require(whitelistedTokens[_token], "Vesting.createVestingSchedule: token not whitelisted");
+        require(_beneficiary != address(0), "Vesting.createVestingSchedule: Beneficiary cannot be empty");
+        require(_amount > 0, "Vesting.createVestingSchedule: Amount cannot be empty");
+        require(_durationInDays > 0, "Vesting.createVestingSchedule: Duration cannot be empty");
+        require(_cliffDurationInDays <= _durationInDays, "Vesting.createVestingSchedule: Cliff can not be bigger than duration");
+
+        // Create schedule
+        uint256 durationInSecs = _durationInDays.mul(PERIOD_ONE_DAY_IN_SECONDS);
+        uint256 cliffDurationInSecs = _cliffDurationInDays.mul(PERIOD_ONE_DAY_IN_SECONDS);
+        uint256 scheduleId = vestingSchedules.length;
+        vestingSchedules.push(
+            Schedule({
+                token: _token,
+                beneficiary: _beneficiary,
+                start : _start,
+                end : _start.add(durationInSecs),
+                cliff : _start.add(cliffDurationInSecs),
+                amount : _amount,
+                drawDownRate : _amount.div(durationInSecs)
+            })
+        );
+
+        beneficiaryVestingSchedules[_beneficiary].add(scheduleId);
+
+        emit ScheduleCreated(_beneficiary, scheduleId);
+    }
 
     function _drawDown(uint256 _scheduleId) internal {
         Schedule storage schedule = vestingSchedules[_scheduleId];

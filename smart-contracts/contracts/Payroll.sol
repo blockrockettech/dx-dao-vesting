@@ -11,7 +11,7 @@ import { AccessControls } from "./AccessControls.sol";
 
 import "hardhat/console.sol";
 
-contract Vesting is ReentrancyGuard {
+contract Payroll is ReentrancyGuard {
     using SafeMath for uint256;
     using EnumerableSet for EnumerableSet.UintSet;
 
@@ -39,11 +39,13 @@ contract Vesting is ReentrancyGuard {
         uint256 drawDownRate;
     }
 
-    mapping(uint256 => uint256) public workerExperienceLevelToSalary;
+    AccessControls public accessControls;
+
+    Schedule[] vestingSchedules;
 
     address public dxdToken;
 
-    Schedule[] vestingSchedules;
+    mapping(uint256 => uint256) public workerExperienceLevelToSalary;
 
     /// @notice Schedule ID -> totalDrawn by beneficiary
     mapping(uint256 => uint256) public totalDrawn;
@@ -60,9 +62,8 @@ contract Vesting is ReentrancyGuard {
 
     bool public paused;
 
-    AccessControls public accessControls;
-
     uint256 public durationInDays = 730;
+
     uint256 public cliffDurationInDays = 365;
 
     modifier whenNotPaused() {
@@ -246,6 +247,16 @@ contract Vesting is ReentrancyGuard {
     function removeTokenFromWhitelist(address _tokenAddress) external {
         require(accessControls.hasAdminRole(msg.sender), "Vesting.removeTokenFromWhitelist: Only admin");
         whitelistedTokens[_tokenAddress] = false;
+    }
+
+    function setDurationInDays(uint256 _durationInDays) external {
+        require(accessControls.hasAdminRole(msg.sender), "Vesting.setDurationInDays: Only admin");
+        durationInDays = _durationInDays;
+    }
+
+    function setCliffDurationInDays(uint256 _cliffDurationInDays) external {
+        require(accessControls.hasAdminRole(msg.sender), "Vesting.setDurationInDays: Only admin");
+        durationInDays = _cliffDurationInDays;
     }
 
     receive() payable external {}

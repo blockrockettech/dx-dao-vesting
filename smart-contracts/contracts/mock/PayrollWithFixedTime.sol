@@ -2,10 +2,10 @@
 
 pragma solidity 0.7.6;
 
-import { Vesting } from "../Vesting.sol";
+import { Payroll } from "../Payroll.sol";
 import { AccessControls } from "../AccessControls.sol";
 
-contract VestingWithFixedTime is Vesting {
+contract PayrollWithFixedTime is Payroll {
     uint256 public nowOverride;
 
     constructor(address[] memory _whitelistedTokens,
@@ -13,7 +13,7 @@ contract VestingWithFixedTime is Vesting {
         uint256[] memory _experienceLevels,
         uint256[] memory _salaries
     )
-    Vesting(_whitelistedTokens, _accessControls, _experienceLevels, _salaries) {}
+    Payroll(_whitelistedTokens, _accessControls, _experienceLevels, _salaries) {}
 
     function setNow(uint256 _now) external {
         nowOverride = _now;

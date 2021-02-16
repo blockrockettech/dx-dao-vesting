@@ -9,6 +9,8 @@ import "@openzeppelin/contracts/utils/EnumerableSet.sol";
 
 import { AccessControls } from "./AccessControls.sol";
 
+//import "hardhat/console.sol";
+
 contract Vesting is ReentrancyGuard {
     using SafeMath for uint256;
     using EnumerableSet for EnumerableSet.UintSet;
@@ -56,6 +58,9 @@ contract Vesting is ReentrancyGuard {
 
     AccessControls public accessControls;
 
+    uint256 public durationInDays = 730;
+    uint256 public cliffDurationInDays = 365;
+
     modifier whenNotPaused() {
         require(!paused, "Vesting: Method cannot be invoked as contract has been paused");
         _;
@@ -80,8 +85,6 @@ contract Vesting is ReentrancyGuard {
         uint256 _amount,
         uint256 _start
     ) public {
-        uint256 durationInDays = 730;
-        uint256 cliffDurationInDays = 365;
 
         _createVestingSchedule(
             _token,
@@ -202,10 +205,10 @@ contract Vesting is ReentrancyGuard {
         uint256 activeCount;
         for(uint i = 0; i < activeOrFutureScheduleIdsSetSize; i++) {
             uint256 scheduleId = activeOrFutureScheduleIds.at(i);
-            uint256 availableDrawDownAmount_ = _availableDrawDownAmount(scheduleId);
+            uint256 drawDownAmount = _availableDrawDownAmount(scheduleId);
 
             // if there is an available amount then either an unclaimed or active schedule
-            if (availableDrawDownAmount_ > 0) {
+            if (drawDownAmount > 0) {
                 activeCount = activeCount.add(1);
             }
         }
@@ -306,6 +309,7 @@ contract Vesting is ReentrancyGuard {
 
         // the cliff period has not ended, therefore, no tokens to draw down
         if (_getNow() <= schedule.cliff) {
+
             return 0;
         }
 

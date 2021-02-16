@@ -98,22 +98,7 @@ contract Payroll is ReentrancyGuard {
         accessControls = _accessControls;
     }
 
-    function createVestingScheduleWithDefaults(
-        address _token,
-        address _beneficiary,
-        uint256 _amount,
-        uint256 _start
-    ) public {
 
-        _createVestingSchedule(
-            _token,
-            _beneficiary,
-            _amount,
-            _start,
-            durationInDays,
-            cliffDurationInDays
-        );
-    }
 
     function createVestingSchedule(
         address _token,
@@ -133,33 +118,50 @@ contract Payroll is ReentrancyGuard {
         );
     }
 
-    function createPayroll(
+    function createPayrollWithDefaults(
         address _token,
         address _beneficiary,
-        uint256 _experienceLevel,
-        uint256 _percentageWorked,
-        uint256 _start,
-        uint256 _durationInDays,
-        uint256 _cliffDurationInDays
-    ) external {
-        uint256 monthlySalary = workerExperienceLevelToSalary[_experienceLevel];
-        require(monthlySalary > 0, "createPayroll: Invalid experience level");
+        uint256 _amount,
+        uint256 _start
+    ) public {
 
-        uint256 yearlySalary = monthlySalary.mul(12);
-        uint256 dailyAmount = yearlySalary.div(365);
-        uint256 fullAmountToVest = _durationInDays.mul(dailyAmount);
-
-        uint256 amountToVest = fullAmountToVest.div(100).mul(_percentageWorked);
-
-        createVestingSchedule(
+        _createVestingSchedule(
             _token,
             _beneficiary,
-            amountToVest,
+            _amount,
             _start,
-            _durationInDays,
-            _cliffDurationInDays
+            durationInDays,
+            cliffDurationInDays
         );
     }
+
+//    function createPayroll(
+//        address _token,
+//        address _beneficiary,
+//        uint256 _experienceLevel,
+//        uint256 _percentageWorked,
+//        uint256 _start,
+//        uint256 _durationInDays,
+//        uint256 _cliffDurationInDays
+//    ) external {
+//        uint256 monthlySalary = workerExperienceLevelToSalary[_experienceLevel];
+//        require(monthlySalary > 0, "createPayroll: Invalid experience level");
+//
+//        uint256 yearlySalary = monthlySalary.mul(12);
+//        uint256 dailyAmount = yearlySalary.div(365);
+//        uint256 fullAmountToVest = _durationInDays.mul(dailyAmount);
+//
+//        uint256 amountToVest = fullAmountToVest.div(100).mul(_percentageWorked);
+//
+//        createVestingSchedule(
+//            _token,
+//            _beneficiary,
+//            amountToVest,
+//            _start,
+//            _durationInDays,
+//            _cliffDurationInDays
+//        );
+//    }
 
     function createPayrollAndDxd(
         address _token,
@@ -179,7 +181,7 @@ contract Payroll is ReentrancyGuard {
         uint256 amountToVest = fullAmountToVest.div(100).mul(_percentageWorked);
 
         // Payroll
-        createVestingScheduleWithDefaults(
+        createPayrollWithDefaults(
             _token,
             _beneficiary,
             amountToVest,
@@ -187,7 +189,7 @@ contract Payroll is ReentrancyGuard {
         );
 
         // DXD
-        createVestingScheduleWithDefaults(
+        createPayrollWithDefaults(
             dxdToken,
             _beneficiary,
             _dxdAmount,
@@ -249,14 +251,10 @@ contract Payroll is ReentrancyGuard {
         whitelistedTokens[_tokenAddress] = false;
     }
 
-    function setDurationInDays(uint256 _durationInDays) external {
-        require(accessControls.hasAdminRole(msg.sender), "Vesting.setDurationInDays: Only admin");
+    function setDurationAndCliffInDays(uint256 _durationInDays, uint256 _cliffDurationInDays) external {
+        require(accessControls.hasAdminRole(msg.sender), "Vesting.setDurationAndCliffInDays: Only admin");
         durationInDays = _durationInDays;
-    }
-
-    function setCliffDurationInDays(uint256 _cliffDurationInDays) external {
-        require(accessControls.hasAdminRole(msg.sender), "Vesting.setDurationInDays: Only admin");
-        durationInDays = _cliffDurationInDays;
+        cliffDurationInDays = _cliffDurationInDays;
     }
 
     receive() payable external {}
@@ -373,7 +371,7 @@ contract Payroll is ReentrancyGuard {
 
     function _drawDown(uint256 _scheduleId) internal {
         Schedule storage schedule = vestingSchedules[_scheduleId];
-        require(schedule.amount > 0, "Vesting.drawDown: There is no schedule currently in flight");
+        require(schedule.amount > 0, "Vesting.drawDown: There is no schedule currently in flight"); // FIXME can you hit this?
 
         // available right now
         uint256 amount = _availableDrawDownAmount(_scheduleId);

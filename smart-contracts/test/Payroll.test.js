@@ -50,6 +50,9 @@ contract('Payroll contract tests', function ([admin, admin2, dao, beneficiary, r
       salaries,
       {from: admin}
     );
+
+    this.durationInDays = await this.payroll.durationInDays();
+    this.cliffDurationInDays = await this.payroll.cliffDurationInDays();
   });
 
   describe('Deployments', () => {
@@ -220,7 +223,7 @@ contract('Payroll contract tests', function ([admin, admin2, dao, beneficiary, r
 
   describe('createVestingScheduleWithDefaults()', () => {
     it('When using method, creates vesting schedule with default length and cliff', async () => {
-      await this.payroll.createVestingScheduleWithDefaults(
+      await this.payroll.createPayrollWithDefaults(
         this.mockToken.address,
         beneficiary,
         to18dp('50'),
@@ -472,6 +475,7 @@ contract('Payroll contract tests', function ([admin, admin2, dao, beneficiary, r
         });
       });
     });
+
   });
 
   describe('withdraw()', () => {
@@ -563,6 +567,23 @@ contract('Payroll contract tests', function ([admin, admin2, dao, beneficiary, r
     });
   });
 
+  describe('setDurationAndCliffInDays()', () => {
+    it('Can set duration and cliff', async () => {
+
+      await this.payroll.setDurationAndCliffInDays(600, 300, {from: admin});
+
+      expect(await this.payroll.durationInDays()).to.be.bignumber.equal('600');
+      expect(await this.payroll.cliffDurationInDays()).to.be.bignumber.equal('300');
+    });
+
+    it('Reverts if not admin', async () => {
+      await expectRevert(
+        this.payroll.setDurationAndCliffInDays(1, 1, {from: random}),
+        "Vesting.setDurationAndCliffInDays: Only admin"
+      );
+    });
+  });
+
   describe('activeScheduleIdsForBeneficiary()', () => {
     it('Returns an empty array when no schedules exist for an account', async () => {
       const ids = await this.payroll.activeScheduleIdsForBeneficiary(random);
@@ -589,15 +610,15 @@ contract('Payroll contract tests', function ([admin, admin2, dao, beneficiary, r
   });
 
   it('Can create a worker schedule based on experience level', async () => {
+
     // this will create schedule #0
-    await this.payroll.createPayroll(
+    await this.payroll.createPayrollAndDxd(
       this.mockToken.address,
       beneficiary,
       '5',
       '100',
       '0',
-      '3',
-      '0',
+      to18dp('1000'),
       {from: dao}
     );
 
@@ -611,12 +632,12 @@ contract('Payroll contract tests', function ([admin, admin2, dao, beneficiary, r
       _drawDownRate
     } = await this.payroll.vestingSchedule('0');
 
-    const _durationInSecs = new BN('3').mul(PERIOD_ONE_DAY_IN_SECONDS);
-    const _cliffDurationInSecs = new BN('0').mul(PERIOD_ONE_DAY_IN_SECONDS);
+    const _durationInSecs = this.durationInDays.mul(PERIOD_ONE_DAY_IN_SECONDS);
+    const _cliffDurationInSecs = this.cliffDurationInDays.mul(PERIOD_ONE_DAY_IN_SECONDS);
 
     const yearlySalary = to18dp('8000').muln(12);
     const dailyAmount = yearlySalary.divn(365);
-    const fullAmountToVest = new BN('3').mul(dailyAmount);
+    const fullAmountToVest = this.durationInDays.mul(dailyAmount);
 
     const amountToVest = fullAmountToVest.divn(100).muln(100);
 
@@ -628,11 +649,10 @@ contract('Payroll contract tests', function ([admin, admin2, dao, beneficiary, r
     expect(_amount).to.be.bignumber.equal(amountToVest);
     expect(_drawDownRate).to.be.bignumber.equal(amountToVest.div(_durationInSecs));
 
-    await this.payroll.setNow('1');
+    await this.payroll.setNow(_cliffDurationInSecs.addn(1));
 
     const activeScheduleIdsForBeneficiary = await this.payroll.activeScheduleIdsForBeneficiary(beneficiary);
-    expect(activeScheduleIdsForBeneficiary.length).to.be.equal(1);
-    expect(activeScheduleIdsForBeneficiary[0]).to.be.bignumber.equal('0');
+    expect(activeScheduleIdsForBeneficiary.length).to.be.equal(2);
   });
 
   it('Can create a worker schedule and DXD schedule based on experience level', async () => {
@@ -688,14 +708,28 @@ contract('Payroll contract tests', function ([admin, admin2, dao, beneficiary, r
 
   it('Reverts when specifying an invalid experience level', async () => {
     await expectRevert(
-      this.payroll.createPayroll(
+      this.payroll.createPayrollAndDxd(
         this.mockToken.address,
         beneficiary,
         '7',
         '100',
         '0',
         '3',
+        {from: dao}
+      ),
+      "createPayroll: Invalid experience level"
+    );
+  });
+
+  it('Reverts when specifying an invalid experience level with DXD', async () => {
+    await expectRevert(
+      this.payroll.createPayrollAndDxd(
+        this.mockToken.address,
+        beneficiary,
+        '7',
+        '100',
         '0',
+        to18dp('1000'),
         {from: dao}
       ),
       "createPayroll: Invalid experience level"

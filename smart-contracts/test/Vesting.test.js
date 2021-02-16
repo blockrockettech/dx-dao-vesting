@@ -25,13 +25,31 @@ contract('Vesting contract tests', function ([admin, admin2, dao, beneficiary, r
     ).to.be.closeTo(parseFloat(expected.toString()), 0.000001);
   };
 
+  const experienceToSalary = {
+    1: '4000',
+    2: '5000',
+    3: '6000',
+    4: '7000',
+    5: '8000'
+  };
+
+  const experienceLevels = Object.keys(experienceToSalary);
+  const salaries = experienceLevels.map(level => to18dp(experienceToSalary[level]));
+
   beforeEach(async () => {
     this.accessControls = await AccessControls.new({from: admin});
     await this.accessControls.addWhitelistRole(dao, {from: admin});
 
     this.mockToken = await MockERC20.new();
+    this.mockDxdToken = await MockERC20.new();
 
-    this.vesting = await Vesting.new([this.mockToken.address], this.accessControls.address, {from: admin});
+    this.vesting = await VestingWithFixedTime.new(
+      [this.mockDxdToken.address, this.mockToken.address],
+      this.accessControls.address,
+      experienceLevels,
+      salaries,
+      {from: admin}
+    );
   });
 
   describe('Deployments', () => {
@@ -42,14 +60,25 @@ contract('Vesting contract tests', function ([admin, admin2, dao, beneficiary, r
 
     it('Reverts when whitelist token array is empty', async () => {
       await expectRevert(
-        Vesting.new([], this.accessControls.address, {from: admin}),
+        Vesting.new(
+          [],
+          this.accessControls.address,
+          experienceLevels,
+          salaries,
+          {from: admin}
+        ),
         "At least 1 token must be whitelisted"
       );
     });
 
     it('Reverts when a whitelist token is address zero', async () => {
       await expectRevert(
-        Vesting.new([ZERO_ADDRESS], this.accessControls.address, {from: admin}),
+        Vesting.new(
+          [ZERO_ADDRESS],
+          this.accessControls.address,
+          experienceLevels,
+          salaries, {from: admin}
+        ),
         "Supplied address cannot be the zero address"
       );
     });
@@ -58,10 +87,11 @@ contract('Vesting contract tests', function ([admin, admin2, dao, beneficiary, r
   describe('createVestingSchedule()', () => {
     it('Can successfully create a schedule with valid params', async () => {
       // this will create schedule ID #0
+      const amount = to18dp('5');
       await this.vesting.createVestingSchedule(
         this.mockToken.address,
         beneficiary,
-        '5',
+        amount,
         '0',
         '3',
         '1',
@@ -86,8 +116,11 @@ contract('Vesting contract tests', function ([admin, admin2, dao, beneficiary, r
       expect(_start).to.be.bignumber.equal('0');
       expect(_end).to.be.bignumber.equal(_durationInSecs);
       expect(_cliff).to.be.bignumber.equal(_cliffDurationInSecs);
-      expect(_amount).to.be.bignumber.equal('5');
-      expect(_drawDownRate).to.be.bignumber.equal(new BN('5').div(_durationInSecs));
+      expect(_amount).to.be.bignumber.equal(amount);
+      expect(_drawDownRate).to.be.bignumber.equal(amount.div(_durationInSecs));
+
+      const oneDayAfterStart = PERIOD_ONE_DAY_IN_SECONDS.addn(1); // add start time
+      await this.vesting.setNow(oneDayAfterStart);
 
       const activeScheduleIdsForBeneficiary = await this.vesting.activeScheduleIdsForBeneficiary(_beneficiary);
       expect(activeScheduleIdsForBeneficiary.length).to.be.equal(1);
@@ -216,6 +249,8 @@ contract('Vesting contract tests', function ([admin, admin2, dao, beneficiary, r
       expect(_amount).to.be.bignumber.equal(to18dp('50'));
       expect(_drawDownRate).to.be.bignumber.equal(to18dp('50').div(_durationInSecs));
 
+      await this.vesting.setNow(_cliffDurationInSecs.addn(1));
+
       const activeScheduleIdsForBeneficiary = await this.vesting.activeScheduleIdsForBeneficiary(_beneficiary);
       expect(activeScheduleIdsForBeneficiary.length).to.be.equal(1);
       expect(activeScheduleIdsForBeneficiary[0]).to.be.bignumber.equal('0');
@@ -225,7 +260,13 @@ contract('Vesting contract tests', function ([admin, admin2, dao, beneficiary, r
   describe('drawing down', () => {
     beforeEach(async () => {
       // we need to override the real vesting contract with a mock one that allows time to be moved easily
-      this.vesting = await VestingWithFixedTime.new([this.mockToken.address], this.accessControls.address, {from: admin});
+      this.vesting = await VestingWithFixedTime.new(
+        [this.mockToken.address],
+        this.accessControls.address,
+        experienceLevels,
+        salaries,
+        {from: admin}
+      );
 
       // set now
       await this.vesting.setNow('1');

@@ -7,7 +7,7 @@ const {expect} = require('chai');
 
 const AccessControls = artifacts.require('AccessControls');
 const MockERC20 = artifacts.require('MockERC20');
-const PayrollWithFixedTime = artifacts.require('PayrollWithFixedTime');
+const PayrollWithFixedTime = artifacts.require('VestingWithFixedTime');
 
 contract('Payroll contract tests', function ([admin, dao, beneficiary, ...otherAccounts]) {
 
@@ -89,15 +89,7 @@ contract('Payroll contract tests', function ([admin, dao, beneficiary, ...otherA
     expect(activeScheduleIdsForBeneficiary[0]).to.be.bignumber.equal('0');
   });
 
-  it.only('Can create a worker schedule and DXD schedule based on experience level', async () => {
-
-
-    // address _token,
-    // address _beneficiary,
-    // uint256 _experienceLevel,
-    // uint256 _percentageWorked,
-    // uint256 _start,
-    // uint256 _dxdAmount
+  it('Can create a worker schedule and DXD schedule based on experience level', async () => {
 
     // this will create schedule #0 and #1
     await this.payroll.createPayrollAndDxd(
@@ -143,9 +135,9 @@ contract('Payroll contract tests', function ([admin, dao, beneficiary, ...otherA
     expect(scheduleDxd._drawDownRate).to.be.bignumber.equal(amountToVestDxd.div(_durationInSecs));
 
     const activeScheduleIdsForBeneficiary = await this.payroll.activeScheduleIdsForBeneficiary(beneficiary);
-    console.log(activeScheduleIdsForBeneficiary);
     expect(activeScheduleIdsForBeneficiary.length).to.be.equal(2);
     expect(activeScheduleIdsForBeneficiary[0]).to.be.bignumber.equal('0');
+    expect(activeScheduleIdsForBeneficiary[1]).to.be.bignumber.equal('1');
   });
 
   it('Reverts when specifying an invalid experience level', async () => {

@@ -9,7 +9,7 @@ import "@openzeppelin/contracts/utils/EnumerableSet.sol";
 
 import { AccessControls } from "./AccessControls.sol";
 
-//import "hardhat/console.sol";
+import "hardhat/console.sol";
 
 contract Vesting is ReentrancyGuard {
     using SafeMath for uint256;
@@ -39,6 +39,10 @@ contract Vesting is ReentrancyGuard {
         uint256 drawDownRate;
     }
 
+    mapping(uint256 => uint256) public workerExperienceLevelToSalary;
+
+    address public dxdToken;
+
     Schedule[] vestingSchedules;
 
     /// @notice Schedule ID -> totalDrawn by beneficiary
@@ -66,8 +70,22 @@ contract Vesting is ReentrancyGuard {
         _;
     }
 
-    constructor(address[] memory _whitelistedTokens, AccessControls _accessControls) {
+    constructor(
+        address[] memory _whitelistedTokens,
+        AccessControls _accessControls,
+        uint256[] memory _experienceLevels,
+        uint256[] memory _salaries
+    ) {
+        require(_experienceLevels.length > 0, "No experience configs supplied");
+        require(_salaries.length == _experienceLevels.length, "Inconsistent experience level array lengths");
         require(_whitelistedTokens.length > 0, "At least 1 token must be whitelisted");
+
+        for (uint i = 0; i < _salaries.length; i++) {
+            workerExperienceLevelToSalary[_experienceLevels[i]] = _salaries[i];
+        }
+
+        // pass DXD in first
+        dxdToken = _whitelistedTokens[0];
 
         for(uint i = 0; i < _whitelistedTokens.length; i++) {
             address _token = _whitelistedTokens[i];
@@ -97,7 +115,6 @@ contract Vesting is ReentrancyGuard {
     }
 
     function createVestingSchedule(
-        // todo: should we check the token at the specified address implements the ERC20 interface?
         address _token,
         address _beneficiary,
         uint256 _amount,
@@ -113,6 +130,73 @@ contract Vesting is ReentrancyGuard {
             _durationInDays,
             _cliffDurationInDays
         );
+    }
+
+    function createPayroll(
+        address _token,
+        address _beneficiary,
+        uint256 _experienceLevel,
+        uint256 _percentageWorked,
+        uint256 _start,
+        uint256 _durationInDays,
+        uint256 _cliffDurationInDays
+    ) external {
+        uint256 monthlySalary = workerExperienceLevelToSalary[_experienceLevel];
+        require(monthlySalary > 0, "createPayroll: Invalid experience level");
+
+        uint256 yearlySalary = monthlySalary.mul(12);
+        uint256 dailyAmount = yearlySalary.div(365);
+        uint256 fullAmountToVest = _durationInDays.mul(dailyAmount);
+
+        uint256 amountToVest = fullAmountToVest.div(100).mul(_percentageWorked);
+
+        createVestingSchedule(
+            _token,
+            _beneficiary,
+            amountToVest,
+            _start,
+            _durationInDays,
+            _cliffDurationInDays
+        );
+    }
+
+    function createPayrollAndDxd(
+        address _token,
+        address _beneficiary,
+        uint256 _experienceLevel,
+        uint256 _percentageWorked,
+        uint256 _start,
+        uint256 _dxdAmount
+    ) external {
+        uint256 monthlySalary = workerExperienceLevelToSalary[_experienceLevel];
+        require(monthlySalary > 0, "createPayroll: Invalid experience level");
+
+        uint256 yearlySalary = monthlySalary.mul(12);
+        uint256 dailyAmount = yearlySalary.div(365);
+        uint256 fullAmountToVest = durationInDays.mul(dailyAmount);
+
+        uint256 amountToVest = fullAmountToVest.div(100).mul(_percentageWorked);
+
+        // Payroll
+        createVestingScheduleWithDefaults(
+            _token,
+            _beneficiary,
+            amountToVest,
+            _start
+        );
+
+        // DXD
+        createVestingScheduleWithDefaults(
+            dxdToken,
+            _beneficiary,
+            _dxdAmount,
+            _start
+        );
+    }
+
+    function updateWorkerExperienceLevelSalary(uint256 _level, uint256 _salary) external {
+        require(accessControls.hasAdminRole(msg.sender), "Payroll.updateWorkerExperienceLevelSalary: Only admin");
+        workerExperienceLevelToSalary[_level] = _salary;
     }
 
     function drawDownAll() whenNotPaused nonReentrant external {
@@ -196,6 +280,7 @@ contract Vesting is ReentrancyGuard {
     function activeScheduleIdsForBeneficiary(address _beneficiary) public view returns (uint256[] memory _activeScheduleIds) {
         EnumerableSet.UintSet storage activeOrFutureScheduleIds = beneficiaryVestingSchedules[_beneficiary];
         uint256 activeOrFutureScheduleIdsSetSize = activeOrFutureScheduleIds.length();
+
 
         if (activeOrFutureScheduleIdsSetSize == 0) {
             uint256[] memory tmp = new uint256[](0);
@@ -309,7 +394,6 @@ contract Vesting is ReentrancyGuard {
 
         // the cliff period has not ended, therefore, no tokens to draw down
         if (_getNow() <= schedule.cliff) {
-
             return 0;
         }
 

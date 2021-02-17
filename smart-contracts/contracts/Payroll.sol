@@ -98,25 +98,23 @@ contract Payroll is ReentrancyGuard {
         accessControls = _accessControls;
     }
 
-
-
-    function createVestingSchedule(
-        address _token,
-        address _beneficiary,
-        uint256 _amount,
-        uint256 _start,
-        uint256 _durationInDays,
-        uint256 _cliffDurationInDays
-    ) public {
-        _createVestingSchedule(
-            _token,
-            _beneficiary,
-            _amount,
-            _start,
-            _durationInDays,
-            _cliffDurationInDays
-        );
-    }
+//    function createVestingSchedule(
+//        address _token,
+//        address _beneficiary,
+//        uint256 _amount,
+//        uint256 _start,
+//        uint256 _durationInDays,
+//        uint256 _cliffDurationInDays
+//    ) public {
+//        _createVestingSchedule(
+//            _token,
+//            _beneficiary,
+//            _amount,
+//            _start,
+//            _durationInDays,
+//            _cliffDurationInDays
+//        );
+//    }
 
     function createPayrollWithDefaults(
         address _token,
@@ -124,7 +122,6 @@ contract Payroll is ReentrancyGuard {
         uint256 _amount,
         uint256 _start
     ) public {
-
         _createVestingSchedule(
             _token,
             _beneficiary,
@@ -134,34 +131,6 @@ contract Payroll is ReentrancyGuard {
             cliffDurationInDays
         );
     }
-
-//    function createPayroll(
-//        address _token,
-//        address _beneficiary,
-//        uint256 _experienceLevel,
-//        uint256 _percentageWorked,
-//        uint256 _start,
-//        uint256 _durationInDays,
-//        uint256 _cliffDurationInDays
-//    ) external {
-//        uint256 monthlySalary = workerExperienceLevelToSalary[_experienceLevel];
-//        require(monthlySalary > 0, "createPayroll: Invalid experience level");
-//
-//        uint256 yearlySalary = monthlySalary.mul(12);
-//        uint256 dailyAmount = yearlySalary.div(365);
-//        uint256 fullAmountToVest = _durationInDays.mul(dailyAmount);
-//
-//        uint256 amountToVest = fullAmountToVest.div(100).mul(_percentageWorked);
-//
-//        createVestingSchedule(
-//            _token,
-//            _beneficiary,
-//            amountToVest,
-//            _start,
-//            _durationInDays,
-//            _cliffDurationInDays
-//        );
-//    }
 
     function createPayrollAndDxd(
         address _token,

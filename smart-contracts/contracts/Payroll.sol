@@ -222,169 +222,170 @@ contract Payroll is ReentrancyGuard {
         cliffDurationInDays = _cliffDurationInDays;
     }
 
-receive() payable external {}
+    receive() payable external {}
 
-///////////////
-// Accessors //
-///////////////
-
-
-function vestingSchedule(uint256 _scheduleId) external view returns (
-address _token,
-address _beneficiary,
-uint256 _start,
-uint256 _end,
-uint256 _cliff,
-uint256 _amount,
-uint256 _drawDownRate
-) {
-Schedule storage schedule = vestingSchedules[_scheduleId];
-
-return (
-schedule.token,
-schedule.beneficiary,
-schedule.start,
-schedule.end,
-schedule.cliff,
-schedule.amount,
-schedule.drawDownRate
-);
-}
-
-function activeScheduleIdsForBeneficiary(address _beneficiary) public view returns (uint256[] memory _activeScheduleIds) {
-EnumerableSet.UintSet storage activeOrFutureScheduleIds = beneficiaryVestingSchedules[_beneficiary];
-uint256 activeOrFutureScheduleIdsSetSize = activeOrFutureScheduleIds.length();
+    ///////////////
+    // Accessors //
+    ///////////////
 
 
-if (activeOrFutureScheduleIdsSetSize == 0) {
-uint256[] memory tmp = new uint256[](0);
-return tmp;
-}
+    function vestingSchedule(uint256 _scheduleId) external view returns (
+        address _token,
+        address _beneficiary,
+        uint256 _start,
+        uint256 _end,
+        uint256 _cliff,
+        uint256 _amount,
+        uint256 _drawDownRate
+    ) {
+        Schedule storage schedule = vestingSchedules[_scheduleId];
 
-uint256 activeCount;
-for (uint i = 0; i < activeOrFutureScheduleIdsSetSize; i++) {
-uint256 scheduleId = activeOrFutureScheduleIds.at(i);
-uint256 drawDownAmount = _availableDrawDownAmount(scheduleId);
+        return (
+        schedule.token,
+        schedule.beneficiary,
+        schedule.start,
+        schedule.end,
+        schedule.cliff,
+        schedule.amount,
+        schedule.drawDownRate
+        );
+    }
 
-// if there is an available amount then either an unclaimed or active schedule
-if (drawDownAmount > 0) {
-activeCount = activeCount.add(1);
-}
-}
+    function activeScheduleIdsForBeneficiary(address _beneficiary) public view returns (uint256[] memory _activeScheduleIds) {
+        EnumerableSet.UintSet storage activeOrFutureScheduleIds = beneficiaryVestingSchedules[_beneficiary];
+        uint256 activeOrFutureScheduleIdsSetSize = activeOrFutureScheduleIds.length();
 
-// loop needed twice to allocate memory for the array
-uint256[] memory activeScheduleIds = new uint256[](activeCount);
-uint256 nextIndex;
-for (uint j = 0; j < activeOrFutureScheduleIdsSetSize; j++) {
-uint256 scheduleId = activeOrFutureScheduleIds.at(j);
-uint256 availableDrawDownAmount_ = _availableDrawDownAmount(scheduleId);
 
-// if there is an available amount then either an unclaimed or active schedule
-if (availableDrawDownAmount_ > 0) {
-activeScheduleIds[nextIndex] = scheduleId;
-nextIndex = nextIndex.add(1);
-}
-}
+        if (activeOrFutureScheduleIdsSetSize == 0) {
+            uint256[] memory tmp = new uint256[](0);
+            return tmp;
+        }
 
-return activeScheduleIds;
-}
+        uint256 activeCount;
+        for (uint i = 0; i < activeOrFutureScheduleIdsSetSize; i++) {
+            uint256 scheduleId = activeOrFutureScheduleIds.at(i);
+            uint256 drawDownAmount = _availableDrawDownAmount(scheduleId);
 
-function availableDrawDownAmount(uint256 _scheduleId) external view returns (uint256 _amount) {
-return _availableDrawDownAmount(_scheduleId);
-}
+            // if there is an available amount then either an unclaimed or active schedule
+            if (drawDownAmount > 0) {
+                activeCount = activeCount.add(1);
+            }
+        }
 
-//////////////
-// Internal //
-//////////////
+        // loop needed twice to allocate memory for the array
+        uint256[] memory activeScheduleIds = new uint256[](activeCount);
+        uint256 nextIndex;
+        for (uint j = 0; j < activeOrFutureScheduleIdsSetSize; j++) {
+            uint256 scheduleId = activeOrFutureScheduleIds.at(j);
+            uint256 availableDrawDownAmount_ = _availableDrawDownAmount(scheduleId);
 
-function _createVestingSchedule(
-address _token,
-address _beneficiary,
-uint256 _amount,
-uint256 _start,
-uint256 _durationInDays,
-uint256 _cliffDurationInDays
-) private {
-require(accessControls.hasWhitelistRole(msg.sender), "Vesting.createVestingSchedule: Only whitelist");
+            // if there is an available amount then either an unclaimed or active schedule
+            if (availableDrawDownAmount_ > 0) {
+                activeScheduleIds[nextIndex] = scheduleId;
+                nextIndex = nextIndex.add(1);
+            }
+        }
 
-require(whitelistedTokens[_token], "Vesting.createVestingSchedule: token not whitelisted");
-require(_beneficiary != address(0), "Vesting.createVestingSchedule: Beneficiary cannot be empty");
-require(_amount > 0, "Vesting.createVestingSchedule: Amount cannot be empty");
-require(_durationInDays > 0, "Vesting.createVestingSchedule: Duration cannot be empty");
-require(_cliffDurationInDays <= _durationInDays, "Vesting.createVestingSchedule: Cliff can not be bigger than duration");
+        return activeScheduleIds;
+    }
 
-// Create schedule
-uint256 durationInSecs = _durationInDays.mul(PERIOD_ONE_DAY_IN_SECONDS);
-uint256 cliffDurationInSecs = _cliffDurationInDays.mul(PERIOD_ONE_DAY_IN_SECONDS);
-uint256 scheduleId = vestingSchedules.length;
-vestingSchedules.push(
-Schedule({
-token : _token,
-beneficiary : _beneficiary,
-start : _start,
-end : _start.add(durationInSecs),
-cliff : _start.add(cliffDurationInSecs),
-amount : _amount,
-drawDownRate : _amount.div(durationInSecs)
-})
-);
+    function availableDrawDownAmount(uint256 _scheduleId) external view returns (uint256 _amount) {
+        return _availableDrawDownAmount(_scheduleId);
+    }
 
-beneficiaryVestingSchedules[_beneficiary].add(scheduleId);
+    //////////////
+    // Internal //
+    //////////////
 
-emit ScheduleCreated(_beneficiary, scheduleId);
-}
+    function _createVestingSchedule(
+        address _token,
+        address _beneficiary,
+        uint256 _amount,
+        uint256 _start,
+        uint256 _durationInDays,
+        uint256 _cliffDurationInDays
+    ) private {
+        require(accessControls.hasWhitelistRole(msg.sender), "Vesting.createVestingSchedule: Only whitelist");
 
-function _drawDown(uint256 _scheduleId) internal {
-Schedule storage schedule = vestingSchedules[_scheduleId];
-require(schedule.amount > 0, "Vesting.drawDown: There is no schedule currently in flight"); // FIXME can you hit this?
+        require(whitelistedTokens[_token], "Vesting.createVestingSchedule: token not whitelisted");
+        require(_beneficiary != address(0), "Vesting.createVestingSchedule: Beneficiary cannot be empty");
+        require(_amount > 0, "Vesting.createVestingSchedule: Amount cannot be empty");
+        require(_durationInDays > 0, "Vesting.createVestingSchedule: Duration cannot be empty");
+        require(_cliffDurationInDays <= _durationInDays, "Vesting.createVestingSchedule: Cliff can not be bigger than duration");
 
-// available right now
-uint256 amount = _availableDrawDownAmount(_scheduleId);
-require(amount > 0, "Vesting.drawDown: Nothing to withdraw");
+        // Create schedule
+        uint256 durationInSecs = _durationInDays.mul(PERIOD_ONE_DAY_IN_SECONDS);
+        uint256 cliffDurationInSecs = _cliffDurationInDays.mul(PERIOD_ONE_DAY_IN_SECONDS);
+        uint256 scheduleId = vestingSchedules.length;
+        vestingSchedules.push(
+            Schedule({
+            token : _token,
+            beneficiary : _beneficiary,
+            start : _start,
+            end : _start.add(durationInSecs),
+            cliff : _start.add(cliffDurationInSecs),
+            amount : _amount,
+            drawDownRate : _amount.div(durationInSecs)
+            })
+        );
 
-// Update last drawn to now
-lastDrawnAt[_scheduleId] = _getNow();
+        beneficiaryVestingSchedules[_beneficiary].add(scheduleId);
 
-// Increase total drawn amount
-totalDrawn[_scheduleId] = totalDrawn[_scheduleId].add(amount);
+        emit ScheduleCreated(_beneficiary, scheduleId);
+    }
 
-// Issue tokens to beneficiary
-require(
-IERC20(schedule.token).transfer(schedule.beneficiary, amount),
-"Vesting.drawDown: Unable to transfer tokens"
-);
+    function _drawDown(uint256 _scheduleId) internal {
+        Schedule storage schedule = vestingSchedules[_scheduleId];
+        require(schedule.amount > 0, "Vesting.drawDown: There is no schedule currently in flight");
+        // FIXME can you hit this?
 
-emit DrawDown(schedule.beneficiary, amount, _getNow());
-}
+        // available right now
+        uint256 amount = _availableDrawDownAmount(_scheduleId);
+        require(amount > 0, "Vesting.drawDown: Nothing to withdraw");
 
-function _getNow() internal view virtual returns (uint256) {
-return block.timestamp;
-}
+        // Update last drawn to now
+        lastDrawnAt[_scheduleId] = _getNow();
 
-function _availableDrawDownAmount(uint256 _scheduleId) internal view returns (uint256 _amount) {
-Schedule storage schedule = vestingSchedules[_scheduleId];
+        // Increase total drawn amount
+        totalDrawn[_scheduleId] = totalDrawn[_scheduleId].add(amount);
 
-// Cliff
+        // Issue tokens to beneficiary
+        require(
+            IERC20(schedule.token).transfer(schedule.beneficiary, amount),
+            "Vesting.drawDown: Unable to transfer tokens"
+        );
 
-// the cliff period has not ended, therefore, no tokens to draw down
-if (_getNow() <= schedule.cliff) {
-return 0;
-}
+        emit DrawDown(schedule.beneficiary, amount, _getNow());
+    }
 
-// Ended
-if (_getNow() > schedule.end) {
-return schedule.amount.sub(totalDrawn[_scheduleId]);
-}
+    function _getNow() internal view virtual returns (uint256) {
+        return block.timestamp;
+    }
 
-// Active
+    function _availableDrawDownAmount(uint256 _scheduleId) internal view returns (uint256 _amount) {
+        Schedule storage schedule = vestingSchedules[_scheduleId];
 
-// Work out when the last invocation was
-uint256 timeLastDrawnOrStart = lastDrawnAt[_scheduleId] == 0 ? schedule.start : lastDrawnAt[_scheduleId];
+        // Cliff
 
-// Find out how much time has past since last invocation
-uint256 timePassedSinceLastInvocation = _getNow().sub(timeLastDrawnOrStart);
+        // the cliff period has not ended, therefore, no tokens to draw down
+        if (_getNow() <= schedule.cliff) {
+            return 0;
+        }
 
-// Work out how many due tokens - time passed * rate per second
-return timePassedSinceLastInvocation.mul(schedule.drawDownRate);
-}
+        // Ended
+        if (_getNow() > schedule.end) {
+            return schedule.amount.sub(totalDrawn[_scheduleId]);
+        }
+
+        // Active
+
+        // Work out when the last invocation was
+        uint256 timeLastDrawnOrStart = lastDrawnAt[_scheduleId] == 0 ? schedule.start : lastDrawnAt[_scheduleId];
+
+        // Find out how much time has past since last invocation
+        uint256 timePassedSinceLastInvocation = _getNow().sub(timeLastDrawnOrStart);
+
+        // Work out how many due tokens - time passed * rate per second
+        return timePassedSinceLastInvocation.mul(schedule.drawDownRate);
+    }
 }

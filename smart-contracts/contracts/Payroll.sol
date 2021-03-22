@@ -62,8 +62,8 @@ contract Payroll is ReentrancyGuard {
 
     bool public paused;
 
+    // this is for DXD (not payroll)
     uint256 public durationInDays = 730;
-
     uint256 public cliffDurationInDays = 365;
 
     modifier whenNotPaused() {
@@ -98,6 +98,7 @@ contract Payroll is ReentrancyGuard {
         accessControls = _accessControls;
     }
 
+    // FIXME just payroll - pass cliffInDays, and lengthInDays
     function createPayrollWithDefaults(
         address _token,
         address _beneficiary,
@@ -124,6 +125,10 @@ contract Payroll is ReentrancyGuard {
         );
     }
 
+    // FIXME DXD with no-payroll
+    // new function for just DXD vesting
+    
+    // FIXME  payroll & DXD - pass cliffInDays, and lengthInDays (for payroll) - DXD uses admin defaults
     function createPayrollAndDxd(
         address _token,
         address _beneficiary,

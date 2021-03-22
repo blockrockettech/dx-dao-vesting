@@ -9,8 +9,6 @@ import "@openzeppelin/contracts/utils/EnumerableSet.sol";
 
 import {AccessControls} from "./AccessControls.sol";
 
-import "hardhat/console.sol";
-
 contract Payroll is ReentrancyGuard {
     using SafeMath for uint256;
     using EnumerableSet for EnumerableSet.UintSet;
@@ -98,13 +96,14 @@ contract Payroll is ReentrancyGuard {
         accessControls = _accessControls;
     }
 
-    // FIXME just payroll - pass cliffInDays, and lengthInDays
-    function createPayrollWithDefaults(
+    function createPayroll(
         address _token,
         address _beneficiary,
         uint256 _experienceLevel,
         uint256 _percentageWorked,
-        uint256 _start
+        uint256 _start,
+        uint256 _durationInDays,
+        uint256 _cliffDurationInDays
     ) public {
         uint256 monthlySalary = workerExperienceLevelToSalary[_experienceLevel];
         require(monthlySalary > 0, "createPayroll: Invalid experience level");
@@ -120,21 +119,35 @@ contract Payroll is ReentrancyGuard {
             _beneficiary,
             amountToVest,
             _start,
+            _durationInDays,
+            _cliffDurationInDays
+        );
+    }
+
+    // new function for just DXD vesting
+    function createDxd(
+        address _beneficiary,
+        uint256 _start,
+        uint256 _dxdAmount
+    ) external {
+        _createVestingSchedule(
+            dxdToken,
+            _beneficiary,
+            _dxdAmount,
+            _start,
             durationInDays,
             cliffDurationInDays
         );
     }
 
-    // FIXME DXD with no-payroll
-    // new function for just DXD vesting
-    
-    // FIXME  payroll & DXD - pass cliffInDays, and lengthInDays (for payroll) - DXD uses admin defaults
     function createPayrollAndDxd(
         address _token,
         address _beneficiary,
         uint256 _experienceLevel,
         uint256 _percentageWorked,
         uint256 _start,
+        uint256 _payrollDurationInDays,
+        uint256 _payrollCliffDurationInDays,
         uint256 _dxdAmount
     ) external {
         uint256 monthlySalary = workerExperienceLevelToSalary[_experienceLevel];
@@ -152,8 +165,8 @@ contract Payroll is ReentrancyGuard {
             _beneficiary,
             amountToVest,
             _start,
-            durationInDays,
-            cliffDurationInDays
+            _payrollDurationInDays,
+            _payrollCliffDurationInDays
         );
 
         // DXD

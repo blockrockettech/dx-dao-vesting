@@ -36,6 +36,9 @@ contract('Payroll contract tests', function ([admin, admin2, dao, beneficiary, r
   const experienceLevels = Object.keys(experienceToSalary);
   const salaries = experienceLevels.map(level => to18dp(experienceToSalary[level]));
 
+  const DEFAULT_DURATION_IN_DAYS = new BN('730')
+  const DEFAULT_CLIFF_IN_DAYS = new BN('365')
+
   beforeEach(async () => {
     this.accessControls = await AccessControls.new({from: admin});
     await this.accessControls.addWhitelistRole(dao, {from: admin});
@@ -87,17 +90,19 @@ contract('Payroll contract tests', function ([admin, admin2, dao, beneficiary, r
     });
   });
 
-  describe('createPayrollWithDefaults()', () => {
+  describe('createPayroll()', () => {
     it('Can successfully create a schedule with valid params', async () => {
 
       // this will create schedule ID #0
 
-      await this.payroll.createPayrollWithDefaults(
+      await this.payroll.createPayroll(
         this.mockToken.address,
         beneficiary,
         '5',
         '100',
         '0',
+        DEFAULT_DURATION_IN_DAYS,
+        DEFAULT_CLIFF_IN_DAYS,
         {from: dao}
       );
 
@@ -121,8 +126,8 @@ contract('Payroll contract tests', function ([admin, admin2, dao, beneficiary, r
       expect(_start).to.be.bignumber.equal('0');
       expect(_end).to.be.bignumber.equal(_durationInSecs);
       expect(_cliff).to.be.bignumber.equal(_cliffDurationInSecs);
-      expect(_amount).to.be.bignumber.equal(amountPerDay.mul(this.durationInDays));
-      expect(_drawDownRate).to.be.bignumber.equal(amount.div(_durationInSecs));
+      shouldBeNumberInEtherCloseTo(_amount, fromWei(amountPerDay.mul(this.durationInDays)))
+      expect(_drawDownRate).to.be.bignumber.equal(_amount.div(_durationInSecs));
 
       await this.payroll.setNow(_cliffDurationInSecs.addn(1));
 
@@ -133,12 +138,14 @@ contract('Payroll contract tests', function ([admin, admin2, dao, beneficiary, r
 
     it('Reverts when sender does not have whitelist', async () => {
       await expectRevert(
-        this.payroll.createPayrollWithDefaults(
+        this.payroll.createPayroll(
           this.mockToken.address,
           beneficiary,
           '5',
           '100',
           '0',
+          DEFAULT_DURATION_IN_DAYS,
+          DEFAULT_CLIFF_IN_DAYS,
           {from: random}
         ),
         "Vesting.createVestingSchedule: Only whitelist"
@@ -147,12 +154,14 @@ contract('Payroll contract tests', function ([admin, admin2, dao, beneficiary, r
 
     it('Reverts when token is not whitelisted', async () => {
       await expectRevert(
-        this.payroll.createPayrollWithDefaults(
+        this.payroll.createPayroll(
           random,
           beneficiary,
           '5',
           '100',
           '0',
+          DEFAULT_DURATION_IN_DAYS,
+          DEFAULT_CLIFF_IN_DAYS,
           {from: dao}
         ),
         "Vesting.createVestingSchedule: token not whitelisted"
@@ -161,12 +170,14 @@ contract('Payroll contract tests', function ([admin, admin2, dao, beneficiary, r
 
     it('Reverts when beneficiary is address zero', async () => {
       await expectRevert(
-        this.payroll.createPayrollWithDefaults(
+        this.payroll.createPayroll(
           this.mockToken.address,
           ZERO_ADDRESS,
           '5',
           '100',
           '0',
+          DEFAULT_DURATION_IN_DAYS,
+          DEFAULT_CLIFF_IN_DAYS,
           {from: dao}
         ),
         "Vesting.createVestingSchedule: Beneficiary cannot be empty"
@@ -175,12 +186,14 @@ contract('Payroll contract tests', function ([admin, admin2, dao, beneficiary, r
 
     it.skip('Reverts when amount is zero', async () => {
       await expectRevert(
-        this.payroll.createPayrollWithDefaults(
+        this.payroll.createPayroll(
           this.mockToken.address,
           beneficiary,
           '5',
           '100',
           '0',
+          DEFAULT_DURATION_IN_DAYS,
+          DEFAULT_CLIFF_IN_DAYS,
           {from: dao}
         ),
         "Vesting.createVestingSchedule: Amount cannot be empty"
@@ -189,12 +202,14 @@ contract('Payroll contract tests', function ([admin, admin2, dao, beneficiary, r
 
     it.skip('Reverts when duration is zero', async () => {
       await expectRevert(
-        this.payroll.createPayrollWithDefaults(
+        this.payroll.createPayroll(
           this.mockToken.address,
           beneficiary,
           '5',
           '100',
           '0',
+          DEFAULT_DURATION_IN_DAYS,
+          DEFAULT_CLIFF_IN_DAYS,
           {from: dao}
         ),
         "Vesting.createVestingSchedule: Duration cannot be empty"
@@ -203,12 +218,14 @@ contract('Payroll contract tests', function ([admin, admin2, dao, beneficiary, r
 
     it.skip('Reverts when cliff is bigger than duration', async () => {
       await expectRevert(
-        this.payroll.createPayrollWithDefaults(
+        this.payroll.createPayroll(
           this.mockToken.address,
           beneficiary,
           '5',
           '100',
           '0',
+          DEFAULT_DURATION_IN_DAYS,
+          DEFAULT_CLIFF_IN_DAYS,
           {from: dao}
         ),
         "Vesting.createVestingSchedule: Cliff can not be bigger than duration"
@@ -218,12 +235,16 @@ contract('Payroll contract tests', function ([admin, admin2, dao, beneficiary, r
 
   describe('createVestingScheduleWithDefaults()', () => {
     it('When using method, creates vesting schedule with default length and cliff', async () => {
-      await this.payroll.createPayrollWithDefaults(
+      const experienceLevel = '5'
+
+      await this.payroll.createPayroll(
         this.mockToken.address,
         beneficiary,
-        '5',
+        experienceLevel,
         '100',
         '0',
+        DEFAULT_DURATION_IN_DAYS,
+        DEFAULT_CLIFF_IN_DAYS,
         {from: dao}
       );
 
@@ -240,15 +261,17 @@ contract('Payroll contract tests', function ([admin, admin2, dao, beneficiary, r
       const _durationInSecs = new BN('730').mul(PERIOD_ONE_DAY_IN_SECONDS);
       const _cliffDurationInSecs = new BN('365').mul(PERIOD_ONE_DAY_IN_SECONDS);
 
-      const amountPerDay = to18dp('8000').muln(12).divn(365);
+      const amountPerDay = to18dp(experienceToSalary[experienceLevel]).muln(12).divn(365);
 
       expect(_token).to.be.equal(this.mockToken.address);
       expect(_beneficiary).to.be.equal(beneficiary);
       expect(_start).to.be.bignumber.equal('0');
       expect(_end).to.be.bignumber.equal(_durationInSecs);
       expect(_cliff).to.be.bignumber.equal(_cliffDurationInSecs);
-      expect(_amount).to.be.bignumber.equal(amountPerDay.mul(this.durationInDays));
-      expect(_drawDownRate).to.be.bignumber.equal(to18dp('50').div(_durationInSecs));
+      shouldBeNumberInEtherCloseTo(_amount, fromWei(amountPerDay.mul(this.durationInDays)))
+
+      const amountVested = to18dp(experienceToSalary[experienceLevel]).muln(12).divn(365).muln(730)
+      expect(_drawDownRate).to.be.bignumber.equal(amountVested.div(_durationInSecs));
 
       await this.payroll.setNow(_cliffDurationInSecs.addn(1));
 
@@ -273,7 +296,7 @@ contract('Payroll contract tests', function ([admin, admin2, dao, beneficiary, r
       await this.payroll.setNow('1');
 
       // send funds to the contract
-      await this.mockToken.transfer(this.payroll.address, to18dp('8000').muln(12).muln(5)); // FIXME get this right
+      await this.mockToken.transfer(this.payroll.address, to18dp('1000000')); // FIXME get this right
     });
 
     describe('Validation', () => {
@@ -290,12 +313,14 @@ contract('Payroll contract tests', function ([admin, admin2, dao, beneficiary, r
         this.vestedAmount = to18dp('2');
 
         // this will create schedule #0
-        await this.payroll.createPayrollWithDefaults(
+        await this.payroll.createPayroll(
           this.mockToken.address,
           beneficiary,
           '5',
           '100',
           '0',
+          DEFAULT_DURATION_IN_DAYS,
+          DEFAULT_CLIFF_IN_DAYS,
           {from: dao}
         );
 
@@ -333,12 +358,14 @@ contract('Payroll contract tests', function ([admin, admin2, dao, beneficiary, r
         this.vestedAmount = to18dp('2');
 
         // this will create schedule #0
-        await this.payroll.createPayrollWithDefaults(
+        await this.payroll.createPayroll(
           this.mockToken.address,
           beneficiary,
           '5',
           '100',
           '0',
+          DEFAULT_DURATION_IN_DAYS,
+          DEFAULT_CLIFF_IN_DAYS,
           {from: dao}
         );
       });
@@ -373,32 +400,38 @@ contract('Payroll contract tests', function ([admin, admin2, dao, beneficiary, r
         this.vestedAmount = to18dp('5000');
 
         // this will create schedule #0 and add to the list of active schedules
-        await this.payroll.createPayrollWithDefaults(
+        await this.payroll.createPayroll(
           this.mockToken.address,
           beneficiary,
           '5',
           '100',
           '0',
+          DEFAULT_DURATION_IN_DAYS,
+          DEFAULT_CLIFF_IN_DAYS,
           {from: dao}
         );
 
         // this will create schedule #1 and add to the list of active schedules
-        await this.payroll.createPayrollWithDefaults(
+        await this.payroll.createPayroll(
           this.mockToken.address,
           beneficiary,
           '5',
           '100',
           this.durationInDays.mul(PERIOD_ONE_DAY_IN_SECONDS), // start
+          DEFAULT_DURATION_IN_DAYS,
+          DEFAULT_CLIFF_IN_DAYS,
           {from: dao}
         );
 
         // this will create schedule #2 and add to the list of active schedules
-        await this.payroll.createPayrollWithDefaults(
+        await this.payroll.createPayroll(
           this.mockToken.address,
           beneficiary,
           '5',
           '100',
           this.durationInDays.mul(PERIOD_ONE_DAY_IN_SECONDS).muln(2), // start
+          DEFAULT_DURATION_IN_DAYS,
+          DEFAULT_CLIFF_IN_DAYS,
           {from: dao}
         );
       });
@@ -617,6 +650,8 @@ contract('Payroll contract tests', function ([admin, admin2, dao, beneficiary, r
       '5',
       '100',
       '0',
+      DEFAULT_DURATION_IN_DAYS,
+      DEFAULT_CLIFF_IN_DAYS,
       to18dp('1000'),
       {from: dao}
     );
@@ -663,6 +698,8 @@ contract('Payroll contract tests', function ([admin, admin2, dao, beneficiary, r
       '5',
       '100',
       '0',
+      DEFAULT_DURATION_IN_DAYS,
+      DEFAULT_CLIFF_IN_DAYS,
       to18dp('1000'),
       {from: dao}
     );
@@ -713,6 +750,8 @@ contract('Payroll contract tests', function ([admin, admin2, dao, beneficiary, r
         '7',
         '100',
         '0',
+        DEFAULT_DURATION_IN_DAYS,
+        DEFAULT_CLIFF_IN_DAYS,
         '3',
         {from: dao}
       ),
@@ -728,6 +767,8 @@ contract('Payroll contract tests', function ([admin, admin2, dao, beneficiary, r
         '7',
         '100',
         '0',
+        DEFAULT_DURATION_IN_DAYS,
+        DEFAULT_CLIFF_IN_DAYS,
         to18dp('1000'),
         {from: dao}
       ),

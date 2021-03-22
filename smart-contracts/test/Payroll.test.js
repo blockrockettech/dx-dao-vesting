@@ -689,6 +689,44 @@ contract('Payroll contract tests', function ([admin, admin2, dao, beneficiary, r
     expect(activeScheduleIdsForBeneficiary.length).to.be.equal(2);
   });
 
+  it('Can create a dxd only schedule', async () => {
+    // this will create schedule #0
+    await this.payroll.createDxd(
+      beneficiary,
+      '0',
+      to18dp('1000'),
+      {from: dao}
+    );
+
+    const {
+      _token,
+      _beneficiary,
+      _start,
+      _end,
+      _cliff,
+      _amount,
+      _drawDownRate
+    } = await this.payroll.vestingSchedule('0');
+
+    const _durationInSecs = this.durationInDays.mul(PERIOD_ONE_DAY_IN_SECONDS);
+    const _cliffDurationInSecs = this.cliffDurationInDays.mul(PERIOD_ONE_DAY_IN_SECONDS);
+
+    const amountToVest = to18dp('1000');
+
+    expect(_token).to.be.equal(this.mockDxdToken.address);
+    expect(_beneficiary).to.be.equal(beneficiary);
+    expect(_start).to.be.bignumber.equal('0');
+    expect(_end).to.be.bignumber.equal(_durationInSecs);
+    expect(_cliff).to.be.bignumber.equal(_cliffDurationInSecs);
+    expect(_amount).to.be.bignumber.equal(amountToVest);
+    expect(_drawDownRate).to.be.bignumber.equal(amountToVest.div(_durationInSecs));
+
+    await this.payroll.setNow(_cliffDurationInSecs.addn(1));
+
+    const activeScheduleIdsForBeneficiary = await this.payroll.activeScheduleIdsForBeneficiary(beneficiary);
+    expect(activeScheduleIdsForBeneficiary.length).to.be.equal(1);
+  })
+
   it('Can create a worker schedule and DXD schedule based on experience level', async () => {
 
     // this will create schedule #0 and #1
